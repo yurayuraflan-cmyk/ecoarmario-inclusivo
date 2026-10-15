@@ -1,5 +1,8 @@
 import streamlit as st
 import random
+import google.generativeai as genai
+from PIL import Image
+import urllib.parse
 
 # Configuración de la página
 st.set_page_config(
@@ -7,6 +10,12 @@ st.set_page_config(
     page_icon="🌱",
     layout="wide"
 )
+
+# Configuración segura de la API de Gemini mediante Secrets
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # Estilos CSS para Accesibilidad Sensorial
 st.markdown("""
@@ -51,7 +60,82 @@ st.caption("Armario cápsula inteligente, análisis visual por IA y moda accesib
 st.write("---")
 
 # Crear pestañas para organizar la app
-tab1, tab2 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA & Inspiración Pinterest"])
+tab1, tab2 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA, Colorimetría & Pinterest"])
+
+with tab1:
+    st.header("👔 Tu Armario Cápsula Sostenible")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        prenda_Para guardar tus cambios de manera segura sin que GitHub vuelva a bloquear la clave API por la alerta de seguridad, sigue estos tres pasos rápidos:
+
+1. **Borra todo el contenido** actual del editor de la imagen[cite: 7].
+2. **Pega este código exacto**, que usa la función segura `st.secrets` para leer la clave sin exponerla en el texto del archivo:
+
+```python
+import streamlit as st
+import random
+import google.generativeai as genai
+from PIL import Image
+import urllib.parse
+
+# Configuración de la página
+st.set_page_config(
+    page_title="EcoArmario Inclusivo",
+    page_icon="🌱",
+    layout="wide"
+)
+
+# Configuración segura de la API de Gemini mediante Secrets
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+# Estilos CSS para Accesibilidad Sensorial
+st.markdown("""
+    <style>
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        height: 3em;
+        background-color: #2E7D32;
+        color: white;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #1B5E20;
+        color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Barra lateral - Ajustes de Accesibilidad
+st.sidebar.header("⚙️ Ajustes de Accesibilidad")
+modo_lectura = st.sidebar.checkbox("👁️ Modo Alto Contraste / Lectura Fácil")
+reducir_estimulos = st.sidebar.checkbox("🧠 Modo Sensorial Amigable (Bajo estímulo visual)")
+
+if modo_lectura:
+    st.markdown("""
+        <style>
+        body, .stApp {
+            background-color: #000000 !important;
+            color: #FFFF00 !important;
+        }
+        p, h1, h2, h3, label {
+            color: #FFFF00 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+# Título Principal
+st.title("🌱 EcoArmario Inclusivo")
+st.caption("Armario cápsula inteligente, análisis visual por IA y moda accesible para un consumo sostenible.")
+
+st.write("---")
+
+# Crear pestañas para organizar la app
+tab1, tab2 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA, Colorimetría & Pinterest"])
 
 with tab1:
     st.header("👔 Tu Armario Cápsula Sostenible")
@@ -100,35 +184,56 @@ with tab1:
             st.caption("✅ Se aplicaron las configuraciones ergonómicas y sensoriales seleccionadas.")
 
 with tab2:
-    st.header("📸 Escáner de Prenda con IA (Visión Multimodal)")
-    st.write("Sube una foto de tu prenda de ropa para que la IA la reconozca y encuentre combinaciones en Pinterest.")
+    st.header("📸 Escáner de Prenda, Colorimetría y Proporciones")
+    st.write("Sube la foto de cualquier prenda de tu clóset para analizarla en tiempo real con IA.")
 
-    archivo_imagen = st.file_uploader("Sube una imagen de tu prenda (JPG, PNG)", type=["jpg", "jpeg", "png"])
+    col_sel1, col_sel2 = st.columns(2)
+    with col_sel1:
+        colorimetria = st.selectbox("Tu subtono de piel / estación cromática (Opcional):", ["Neutro", "Cálido (Primavera/Otoño)", "Frío (Verano/Invierno)"])
+    with col_sel2:
+        silueta = st.selectbox("Preferencia de proporciones/corte:", ["Holgado / Confort", "Equilibrado", "Estructurado / Entallado"])
+
+    archivo_imagen = st.file_uploader("Sube una foto de tu ropa (JPG, PNG)", type=["jpg", "jpeg", "png"])
 
     if archivo_imagen is not None:
+        imagen = Image.open(archivo_imagen)
+        
         col_img, col_info = st.columns(2)
         
         with col_img:
-            st.image(archivo_imagen, caption="Prenda subida", use_column_width=True)
+            st.image(imagen, caption="Prenda ingresada", use_column_width=True)
             
         with col_info:
-            st.success("🤖 **Análisis de IA Completado:**")
-            st.write("• **Prenda identificada:** Chompa tejida de lana/algodón")
-            st.write("• **Paleta de color:** Tonos tierra / Neutro suave")
-            st.write("• **Textura:** Tejido suave sin costuras rígidas")
-            st.write("• **Estatus de sostenibilidad:** Alta durabilidad (Armario Cápsula)")
+            if not GEMINI_API_KEY:
+                st.info("ℹ️ Para activar el análisis de la foto por IA en tiempo real, configura `GEMINI_API_KEY` en los Secrets de Streamlit Cloud.")
+            else:
+                with st.spinner("🤖 Analizando la prenda, colorimetría y proporciones con IA..."):
+                    try:
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        prompt = f"""
+                        Analiza detalladamente la foto de esta prenda de vestir.
+                        Considera que el usuario prefiere una colorimetría de tipo '{colorimetria}' y un corte de proporciones '{silueta}'.
+                        
+                        Proporciona una respuesta estructurada y breve en español con los siguientes puntos:
+                        1. **Prenda identificada:** (Nombre exacto)
+                        2. **Paleta de color detectada:** (Colores principales)
+                        3. **Análisis de Colorimetría:** (Cómo combinarla según su subtono {colorimetria})
+                        4. **Sugerencia de Proporciones:** (Cómo armar el outfit para un corte {silueta})
+                        5. **Confort Sensorial:** (Estimación de textura/comodidad)
+                        """
+                        
+                        response = model.generate_content([prompt, imagen])
+                        st.markdown(response.text)
+                    except Exception as e:
+                        st.error(f"Error al analizar la imagen: {e}")
 
-        st.write("---")
-        st.subheader("📌 Inspiración de Estilos en Pinterest")
-        st.write("Sugerencias de outfits combinados con tu prenda analizada:")
-
-        col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1:
-            st.image("https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400", caption="Look 1: Minimalista urbano")
-        with col_p2:
-            st.image("https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=400", caption="Look 2: Casual confort sensorial")
-        with col_p3:
-            st.image("https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400", caption="Look 3: Capas sostenibles")
+            # Enlace dinámico a Pinterest siempre disponible
+            busqueda_pinterest = f"outfit {colorimetria} {silueta} moda sostenible"
+            url_pinterest = f"https://www.pinterest.com/search/pins/?q={urllib.parse.quote(busqueda_pinterest)}"
+            
+            st.write("---")
+            st.subheader("📌 Inspiración en Tiempo Real en Pinterest")
+            st.markdown(f"[👉 Haz clic aquí para ver tableros e ideas de combinación en Pinterest para esta prenda]({url_pinterest})")
 
 # Pie de página
 st.write("---")
