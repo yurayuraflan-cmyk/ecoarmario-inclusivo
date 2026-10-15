@@ -28,7 +28,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Barra lateral - Ajustes de Accesibilidad
+# Barra lateral - Ajustes de Accesibilidad y Estilo Personal
+st.sidebar.header("🎨 Tu Perfil de Estilo Personal")
+estilo_personal = st.sidebar.selectbox(
+    "Selecciona tu estilo preferido:",
+    [
+        "Casual / Urbano",
+        "Minimalista / Neutro",
+        "Elegante / Sofisticado",
+        "Bohemio / Creativo",
+        "Deportivo / Athleisure",
+        "Oversize / Streetwear"
+    ]
+)
+
+st.sidebar.write("---")
 st.sidebar.header("⚙️ Ajustes de Accesibilidad")
 modo_lectura = st.sidebar.checkbox("👁️ Modo Alto Contraste / Lectura Fácil")
 reducir_estimulos = st.sidebar.checkbox("🧠 Modo Sensorial Amigable (Bajo estímulo visual)")
@@ -48,28 +62,28 @@ if modo_lectura:
 
 # Título Principal
 st.title("🌱 EcoArmario Inclusivo")
-st.caption("Armario cápsula inteligente, análisis visual por IA y moda accesible para un consumo sostenible.")
+st.caption(f"Armario cápsula inteligente adaptado a tu estilo **{estilo_personal}**, análisis visual y moda accesible.")
 
 st.write("---")
 
 # Crear pestañas para organizar la app
-tab1, tab2 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA, Colorimetría & Pinterest"])
+tab1, tab2 = st.tabs(["👔 Armario Cápsula por Estilo", "📸 Escáner IA, Colorimetría & Pinterest"])
 
 with tab1:
-    st.header("👔 Tu Armario Cápsula Sostenible")
+    st.header(f"👔 Tu Armario Cápsula — Estilo {estilo_personal}")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
         prenda_superior = st.selectbox(
             "Prenda Superior (Parte de arriba):",
-            ["Polera básica neutra", "Camisa de algodón orgánico", "Polo oversize pastel", "Chompa tejida reciclada"]
+            ["Polera básica neutra", "Camisa de algodón orgánico", "Polo oversize pastel", "Chompa tejida reciclada", "Blazer liviano"]
         )
 
     with col2:
         prenda_inferior = st.selectbox(
             "Prenda Inferior (Parte de abajo):",
-            ["Pantalón denim reciclado", "Pantalón holgado beige", "Falda midi sostenible", "Pantalón deportivo neutro"]
+            ["Pantalón denim reciclado", "Pantalón holgado beige", "Falda midi sostenible", "Pantalón deportivo neutro", "Pantalón de vestir sustentable"]
         )
 
     with col3:
@@ -86,30 +100,31 @@ with tab1:
     st.write("---")
 
     # Botón para generar la combinación
-    if st.button("✨ Generar Combinación Sostenible"):
-        st.success("¡Combinación creada con éxito!")
+    if st.button("✨ Generar Combinación Personalizada"):
+        st.success(f"¡Outfit alineado a tu estilo '{estilo_personal}' generado!")
         
         st.markdown("### 🎯 Tu Outfit Recomendado:")
+        st.write(f"- **Estilo base:** {estilo_personal}")
         st.write(f"- **Arriba:** {prenda_superior}")
         st.write(f"- **Abajo:** {prenda_inferior}")
-        st.write(f"- **Calzado:** {calzado}")
+        st.write(f"- **Calzado/Accesorio:** {calzado}")
         
         # Detalle de impacto ecológico
         ahorro_agua = random.randint(1200, 2500)
-        st.info(f"💡 **Impacto Positivo:** Al usar este outfit cápsula estás reduciendo el consumo excesivo de agua en aprox. **{ahorro_agua} litros** frente al fast fashion.")
+        st.info(f"💡 **Impacto Positivo:** Al armar outfits cápsula dentro de tu estilo personal, aprovechas mejor tus prendas y ahorras aprox. **{ahorro_agua} litros de agua** frente al fast fashion.")
         
         if textura_comoda or facil_puesto:
             st.caption("✅ Se aplicaron las configuraciones ergonómicas y sensoriales seleccionadas.")
 
 with tab2:
     st.header("📸 Escáner de Prenda, Colorimetría y Proporciones")
-    st.write("Sube la foto de cualquier prenda de tu clóset para analizarla y buscar ideas en Pinterest.")
+    st.write(f"Analiza tus prendas y consulta cómo combinarlas según tu perfil **{estilo_personal}**.")
 
     col_sel1, col_sel2 = st.columns(2)
     with col_sel1:
         colorimetria = st.selectbox("Tu subtono de piel / estación cromática:", ["Neutro", "Cálido (Primavera/Otoño)", "Frío (Verano/Invierno)"])
     with col_sel2:
-        silueta = st.selectbox("Preferencia de proporciones/corte:", ["Holgado / Confort", "Equilibrado", "Estructurado / Entallado"])
+        silueta = st.selectbox("Preferencia de corte / silueta:", ["Holgado / Confort", "Equilibrado", "Estructurado / Entallado"])
 
     archivo_imagen = st.file_uploader("Sube una foto de tu ropa (JPG, PNG)", type=["jpg", "jpeg", "png"])
 
@@ -122,20 +137,20 @@ with tab2:
             st.image(imagen, caption="Prenda ingresada", use_column_width=True)
             
         with col_info:
-            st.success("🤖 **Análisis de IA & Colorimetría Completado:**")
-            st.write(f"• **Paleta recomendada:** Tonos armonizados para subtono **{colorimetria}**.")
-            st.write(f"• **Corte y Proporción:** Ajustado para estilo **{silueta}**.")
-            st.write("• **Confort Sensorial:** Apto para hipersensibilidad (telas livianas y costuras planas).")
-            st.write("• **Estatus de sostenibilidad:** Prenda de alta durabilidad para armario cápsula.")
+            st.success("🤖 **Análisis de IA, Estilo & Colorimetría Completado:**")
+            st.write(f"• **Estilo configurado:** {estilo_personal}.")
+            st.write(f"• **Paleta recomendada:** Tonos en armonía para subtono **{colorimetria}**.")
+            st.write(f"• **Corte y Proporción:** Adecuado para un perfil **{silueta}**.")
+            st.write("• **Confort Sensorial:** Apto para hipersensibilidad táctil.")
 
-        # Enlace dinámico a Pinterest
-        busqueda_pinterest = f"outfit {colorimetria} {silueta} moda sostenible"
+        # Enlace dinámico a Pinterest incluyendo el estilo del usuario
+        busqueda_pinterest = f"outfit {estilo_personal} {colorimetria} {silueta} moda sostenible"
         url_pinterest = f"https://www.pinterest.com/search/pins/?q={urllib.parse.quote(busqueda_pinterest)}"
         
         st.write("---")
-        st.subheader("📌 Inspiración en Tiempo Real en Pinterest")
-        st.markdown(f"[👉 Haz clic aquí para ver tableros e ideas de combinación en Pinterest para esta prenda]({url_pinterest})")
+        st.subheader("📌 Inspiración en Pinterest según Tu Estilo")
+        st.markdown(f"[👉 Ver ideas de combinación para estilo **{estilo_personal}** en Pinterest]({url_pinterest})")
 
 # Pie de página
 st.write("---")
-st.caption("EcoArmario Inclusivo — Proyecto de Innovación, IA y Sostenibilidad.")
+st.caption("EcoArmario Inclusivo — Personalización de Estilo, IA y Sostenibilidad.")
