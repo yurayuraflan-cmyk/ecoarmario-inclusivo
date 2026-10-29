@@ -9,54 +9,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS Avanzados - Diseño tipo App Moderna / Startup
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #F8F9FA;
-        color: #212529;
-    }
-    
-    /* Sidebar estilizado */
-    [data-testid="stSidebar"] {
-        background-color: #E9ECEF;
-    }
-    [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] p {
-        color: #1B5E20 !important;
-        font-weight: 600;
-    }
-
-    /* Botones principales con degradado llamativo */
-    .stButton>button {
-        width: 100%;
-        border-radius: 12px;
-        height: 3.4em;
-        background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
-        color: white !important;
-        font-weight: bold;
-        border: none;
-        box-shadow: 0 4px 14px rgba(46, 125, 50, 0.4);
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(46, 125, 50, 0.6);
-        background: linear-gradient(135deg, #388E3C 0%, #2E7D32 100%);
-    }
-    
-    /* Contenedores con estilo de tarjeta moderna */
-    .card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # Barra lateral - Perfil y Accesibilidad
 st.sidebar.markdown("### 🎨 Tu Perfil Personalizado")
 estilo_personal = st.sidebar.selectbox(
@@ -72,19 +24,69 @@ tipo_cuerpo = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ⚙️ Accesibilidad & Inclusión")
 modo_lectura = st.sidebar.checkbox("👁️ Modo Alto Contraste (Daltonismo/Visión)")
-modo_neuro = st.sidebar.checkbox("🧠 Modo Antiestrés Sensorial (Bajo estímulo)")
+modo_neuro = st.sidebar.checkbox("🧠 Modo Antiestrés Sensorial (Bajo estímulo visual)")
+
+# Estilos CSS dinámicos según los modos
+css_estilos = """
+    <style>
+    .stApp {
+        background-color: #F8F9FA;
+        color: #212529;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #E9ECEF;
+    }
+    [data-testid="stSidebar"] h3, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] p {
+        color: #1B5E20 !important;
+        font-weight: 600;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3.4em;
+        background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+        color: white !important;
+        font-weight: bold;
+        border: none;
+        box-shadow: 0 4px 14px rgba(46, 125, 50, 0.4);
+    }
+    .card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    </style>
+"""
 
 if modo_lectura:
-    st.markdown("""
-        <style>
-        body, .stApp { background-color: #000000 !important; color: #FFFF00 !important; }
-        p, h1, h2, h3, label { color: #FFFF00 !important; }
-        </style>
-    """, unsafe_allow_html=True)
+    css_estilos += """
+    <style>
+    body, .stApp { background-color: #000000 !important; color: #FFFF00 !important; }
+    p, h1, h2, h3, label { color: #FFFF00 !important; }
+    </style>
+    """
+
+if modo_neuro:
+    css_estilos += """
+    <style>
+    .stApp { background-color: #EEF4F0 !important; }
+    </style>
+    """
+
+st.markdown(css_estilos, unsafe_allow_html=True)
+
+# Aviso interactivo si el modo antiestrés está activado
+if modo_neuro:
+    st.info("🧠 **Modo Antiestrés Sensorial Activo:** Interfaz adaptada con tonos suaves y estímulos reducidos para prevenir la sobrecarga sensorial.")
 
 # Encabezado Principal
 st.markdown("<h1 style='text-align: center; color: #1B5E20;'>🌱 EcoArmario Inclusivo</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: #666666; font-size: 17px;'>IA de Moda Sostenible • Silueta <b>{tipo_cuerpo.split(' ')[0]}</b> • Diseño Adaptativo & Sensorial</p>", unsafe_allow_html=True)
+if not modo_neuro:
+    st.markdown(f"<p style='text-align: center; color: #666666; font-size: 17px;'>IA de Moda Sostenible • Silueta <b>{tipo_cuerpo.split(' ')[0]}</b> • Diseño Adaptativo & Sensorial</p>", unsafe_allow_html=True)
 
 st.write("---")
 
@@ -92,6 +94,8 @@ tab1, tab2, tab3 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA & Pintere
 
 with tab1:
     st.markdown("### 👔 Diseña tu Armario Cápsula Sostenible")
+    if modo_neuro:
+        st.caption("✨ Vista Zen: Opciones esenciales simplificadas para evitar fatiga cognitiva.")
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -118,6 +122,8 @@ with tab1:
 
 with tab2:
     st.markdown("### 📸 Escáner IA, Análisis Cromático & Pinterest Inspo")
+    if modo_neuro:
+        st.caption("✨ Vista Zen: Espacio de análisis visual limpio.")
     
     c_s1, c_s2 = st.columns(2)
     with c_s1:
@@ -166,9 +172,6 @@ with tab3:
             <p><b>Cómo actúa la app:</b> Al activar el <i>Modo Antiestrés Sensorial</i>, la interfaz bloquea elementos distractores, suaviza la paleta cromática y prioriza fuentes de lectura ultra clara.</p>
         </div>
         """, unsafe_allow_html=True)
-
-    if modo_neuro:
-        st.warning("🧠 **Modo Antiestrés Sensorial Activo:** Interfaz simplificada al máximo, reduciendo estímulos visuales y mostrando solo información esencial.")
 
 st.write("---")
 st.markdown("<p style='text-align: center; color: #777; font-size: 13px;'>EcoArmario Inclusivo — Tecnología, Sostenibilidad e Inclusión Neuromotora.</p>", unsafe_allow_html=True)
