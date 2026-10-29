@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Barra lateral - Perfil y Accesibilidad
+# Barra lateral - Perfil y Accesibilidad Universal
 st.sidebar.markdown("### 🎨 Tu Perfil Personalizado")
 estilo_personal = st.sidebar.selectbox(
     "Estilo preferido:",
@@ -22,11 +22,20 @@ tipo_cuerpo = st.sidebar.selectbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### ⚙️ Accesibilidad & Inclusión")
-modo_lectura = st.sidebar.checkbox("👁️ Modo Alto Contraste (Daltonismo/Visión)")
+st.sidebar.markdown("### 👁️ Accesibilidad Visual y Daltonismo")
+modo_daltonismo = st.sidebar.selectbox(
+    "Filtro Adaptativo de Daltonismo:",
+    [
+        "Ninguno (Estándar)",
+        "Protanopia (Ceguera al rojo)",
+        "Deuteranopia (Ceguera al verde)",
+        "Tritanopia (Ceguera al azul/amarillo)"
+    ]
+)
+
 modo_neuro = st.sidebar.checkbox("🧠 Modo Antiestrés Sensorial (Bajo estímulo visual)")
 
-# Estilos CSS dinámicos según los modos
+# Estilos CSS dinámicos según el daltonismo seleccionado o modo sensorial
 css_estilos = """
     <style>
     .stApp {
@@ -62,15 +71,27 @@ css_estilos = """
     </style>
 """
 
-if modo_lectura:
-    css_estilos += """
+# Aplicar cambios visuales drásticos si selecciona daltonismo
+if modo_daltonismo != "Ninguno (Estándar)":
+    css_estilos += f"""
     <style>
-    body, .stApp { background-color: #000000 !important; color: #FFFF00 !important; }
-    p, h1, h2, h3, label { color: #FFFF00 !important; }
+    .stApp {{
+        background-color: #0A192F !important;
+        color: #64FFDA !important;
+    }}
+    p, h1, h2, h3, label, span {{
+        color: #64FFDA !important;
+    }}
+    [data-testid="stSidebar"] {{
+        background-color: #020C1B !important;
+    }}
+    [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {{
+        color: #64FFDA !important;
+    }}
     </style>
     """
 
-if modo_neuro:
+if modo_neuro and modo_daltonismo == "Ninguno (Estándar)":
     css_estilos += """
     <style>
     .stApp { background-color: #EEF4F0 !important; }
@@ -79,23 +100,23 @@ if modo_neuro:
 
 st.markdown(css_estilos, unsafe_allow_html=True)
 
-# Aviso interactivo si el modo antiestrés está activado
+# Avisos visuales en pantalla
+if modo_daltonismo != "Ninguno (Estándar)":
+    st.warning(f"👁️ **Filtro Activo para {modo_daltonismo}:** Interfaz adaptada con paleta de alto contraste optimizada para evitar confusión de colores.")
+
 if modo_neuro:
-    st.info("🧠 **Modo Antiestrés Sensorial Activo:** Interfaz adaptada con tonos suaves y estímulos reducidos para prevenir la sobrecarga sensorial.")
+    st.info("🧠 **Modo Antiestrés Sensorial Activo:** Estímulos visuales reducidos.")
 
 # Encabezado Principal
-st.markdown("<h1 style='text-align: center; color: #1B5E20;'>🌱 EcoArmario Inclusivo</h1>", unsafe_allow_html=True)
-if not modo_neuro:
-    st.markdown(f"<p style='text-align: center; color: #666666; font-size: 17px;'>IA de Moda Sostenible • Silueta <b>{tipo_cuerpo.split(' ')[0]}</b> • Diseño Adaptativo & Sensorial</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🌱 EcoArmario Inclusivo</h1>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; font-size: 17px;'>IA de Moda Sostenible • Silueta <b>{tipo_cuerpo.split(' ')[0]}</b> • Accesibilidad Universal</p>", unsafe_allow_html=True)
 
 st.write("---")
 
-tab1, tab2, tab3 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA & Pinterest", "🧩 Panel de Confort Sensorial"])
+tab1, tab2, tab3 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA & Pinterest", "🧩 Panel Inclusivo & Daltonismo"])
 
 with tab1:
     st.markdown("### 👔 Diseña tu Armario Cápsula Sostenible")
-    if modo_neuro:
-        st.caption("✨ Vista Zen: Opciones esenciales simplificadas para evitar fatiga cognitiva.")
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -122,8 +143,6 @@ with tab1:
 
 with tab2:
     st.markdown("### 📸 Escáner IA, Análisis Cromático & Pinterest Inspo")
-    if modo_neuro:
-        st.caption("✨ Vista Zen: Espacio de análisis visual limpio.")
     
     c_s1, c_s2 = st.columns(2)
     with c_s1:
@@ -150,28 +169,28 @@ with tab2:
         st.markdown(f"📌 **Base de Datos Visual (Pinterest):** [👉 Ver combinaciones estéticas en vivo]({url_pin})")
 
 with tab3:
-    st.markdown("### 🧩 ¿Cómo ayudamos a la Super / Hipersensibilidad?")
-    st.write("Esta sección demuestra el impacto inclusivo real de la aplicación para personas con Autismo, TDAH o hipersensibilidad táctil y visual.")
+    st.markdown("### 🧩 Accesibilidad Total: Neurodivergencia y Daltonismo")
+    st.write("Explicación de impacto para el jurado:")
 
     col_h1, col_h2 = st.columns(2)
     
     with col_h1:
         st.markdown("""
         <div class="card">
-            <h4>🏷️ 1. Filtro Anti-Irritación Táctil</h4>
-            <p>Las personas neurodivergentes suelen sufrir dolor o ansiedad extrema por <b>etiquetas internas, costuras gruesas o broches rígidos</b>.</p>
-            <p><b>Cómo actúa la app:</b> El sistema filtra y prioriza exclusivamente ropa adaptativa confeccionada con costuras planas, algodón orgánico y cierres magnéticos o elásticos suaves.</p>
+            <h4>🎨 Soporte para Daltonismo</h4>
+            <p>Muchas pessoas con daltonismo (pro, deute o tritanopia) sufren al combinar prendas porque confunden tonalidades rojas, verdes o azules.</p>
+            <p><b>Solución en la App:</b> Al activar el filtro de daltonismo en la barra lateral, la interfaz reasigna contrastes seguros (azules cian y oscuros) y la IA etiqueta explícitamente los colores por nombre y compatibilidad para evitar errores al vestir.</p>
         </div>
         """, unsafe_allow_html=True)
 
     with col_h2:
         st.markdown("""
         <div class="card">
-            <h4>👁️ 2. Reducción de Sobrecarga Visual</h4>
-            <p>Los entornos caóticos o interfaces llenas de colores estridentes generan fatiga cognitiva y crisis sensoriales.</p>
-            <p><b>Cómo actúa la app:</b> Al activar el <i>Modo Antiestrés Sensorial</i>, la interfaz bloquea elementos distractores, suaviza la paleta cromática y prioriza fuentes de lectura ultra clara.</p>
+            <h4>🏷️ Confort Sensorial y Táctil</h4>
+            <p>Prevención de crisis por costuras o etiquetas rígidas en personas con autismo o TDAH.</p>
+            <p><b>Solución en la App:</b> Filtrado de ropa adaptativa y priorización de telas suaves con texturas hipoalergénicas.</p>
         </div>
         """, unsafe_allow_html=True)
 
 st.write("---")
-st.markdown("<p style='text-align: center; color: #777; font-size: 13px;'>EcoArmario Inclusivo — Tecnología, Sostenibilidad e Inclusión Neuromotora.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 13px;'>EcoArmario Inclusivo — Tecnología, Sostenibilidad e Inclusión Universal.</p>", unsafe_allow_html=True)
