@@ -10,26 +10,47 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS para Accesibilidad Sensorial
+# Estilos CSS Avanzados para un diseño "Startup UI/UX"
 st.markdown("""
     <style>
+    /* Fondo general limpio */
+    .stApp {
+        background-color: #FAFAFA;
+    }
+    
+    /* Botones principales modernos */
     .stButton>button {
         width: 100%;
-        border-radius: 8px;
-        height: 3em;
-        background-color: #2E7D32;
+        border-radius: 12px;
+        height: 3.2em;
+        background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
         color: white;
         font-weight: bold;
+        border: none;
+        box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #1B5E20;
-        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(46, 125, 50, 0.4);
+        background: linear-gradient(135deg, #388E3C 0%, #2E7D32 100%);
+    }
+
+    /* Tarjetas de contenedores estéticas */
+    div.stMarkdownContainer {
+        border-radius: 10px;
+    }
+    
+    /* Sidebar personalizado */
+    [data-testid="stSidebar"] {
+        background-color: #F1F8F5;
+        border-right: 1px solid #E0E0E0;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Barra lateral - Perfil de Estilo y Tipo de Cuerpo
-st.sidebar.header("🎨 Tu Perfil Personalizado")
+st.sidebar.markdown("### 🎨 Tu Perfil Personalizado")
 estilo_personal = st.sidebar.selectbox(
     "Selecciona tu estilo preferido:",
     [
@@ -53,8 +74,8 @@ tipo_cuerpo = st.sidebar.selectbox(
     ]
 )
 
-st.sidebar.write("---")
-st.sidebar.header("⚙️ Ajustes de Accesibilidad")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ⚙️ Accesibilidad & Inclusión")
 modo_lectura = st.sidebar.checkbox("👁️ Modo Alto Contraste / Lectura Fácil")
 reducir_estimulos = st.sidebar.checkbox("🧠 Modo Sensorial Amigable (Bajo estímulo visual)")
 
@@ -71,9 +92,9 @@ if modo_lectura:
         </style>
     """, unsafe_allow_html=True)
 
-# Título Principal
-st.title("🌱 EcoArmario Inclusivo")
-st.caption(f"Armario cápsula inteligente adaptado a tu estilo **{estilo_personal}** y tipo de cuerpo **{tipo_cuerpo.split(' ')[0]}**.")
+# Encabezado Principal Impactante
+st.markdown("<h1 style='text-align: center; color: #1B5E20;'>🌱 EcoArmario Inclusivo</h1>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; color: #555555; font-size: 18px;'>Inteligencia Artificial aplicada a la moda sostenible, silueta <b>{tipo_cuerpo.split(' ')[0]}</b> y confort sensorial.</p>", unsafe_allow_html=True)
 
 st.write("---")
 
@@ -81,7 +102,7 @@ st.write("---")
 tab1, tab2 = st.tabs(["👔 Armario Cápsula Inteligente", "📸 Escáner IA, Proporciones & Pinterest Inspo"])
 
 with tab1:
-    st.header("👔 Tu Armario Cápsula Sostenible")
+    st.markdown("### 👔 Diseña tu Armario Cápsula Sostenible")
 
     col1, col2, col3 = st.columns(3)
 
@@ -104,26 +125,29 @@ with tab1:
         )
 
     # Opciones sensoriales
-    st.subheader("🧩 Preferencias Sensoriales del Día")
-    textura_comoda = st.checkbox("Sin etiquetas molestas / Costuras suaves")
-    facil_puesto = st.checkbox("Cierres magnéticos / Elásticos (Fácil de colocar)")
+    st.markdown("#### 🧩 Preferencias Sensoriales del Día")
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        textura_comoda = st.checkbox("Sin etiquetas molestas / Costuras suaves")
+    with col_s2:
+        facil_puesto = st.checkbox("Cierres magnéticos / Elásticos (Fácil de colocar)")
 
-    st.write("---")
+    st.write("")
 
     # Botón para generar la combinación
     if st.button("✨ Generar Combinación Personalizada"):
-        st.success("¡Outfit generado según tu perfil!")
+        st.success("¡Outfit generado con éxito por el motor inteligente!")
         
         col_outfit, col_impacto = st.columns([2, 1])
         
         with col_outfit:
-            st.markdown("### 🎯 Tu Outfit Recomendado:")
+            st.markdown("#### 🎯 Tu Outfit Recomendado:")
             st.write(f"- **Estilo asignado:** {estilo_personal}")
             st.write(f"- **Tipo de Cuerpo:** {tipo_cuerpo}")
             st.write(f"- **Arriba:** {prenda_superior}")
             st.write(f"- **Abajo:** {prenda_inferior}")
             st.write(f"- **Calzado:** {calzado}")
-            st.info(f"💡 **Evaluación de Favorecimiento:** Esta combinación equilibra las proporciones visuales para una silueta **{tipo_cuerpo}**.")
+            st.info(f"💡 **Evaluación de Favorecimiento:** Esta combinación crea un equilibrio visual perfecto para tu silueta.")
 
         with col_impacto:
             ahorro_agua = random.randint(1200, 2500)
@@ -131,15 +155,15 @@ with tab1:
             st.caption("Calculado en base a reutilización de prendas cápsula.")
 
         if textura_comoda or facil_puesto:
-            st.success("✅ **Filtro Sensorial Aplicado:** Combinación libre de etiquetas e irritación táctil.")
+            st.success("✅ **Filtro Sensorial Aplicado:** Combinación adaptativa libre de etiquetas e irritación táctil.")
 
 with tab2:
-    st.header("📸 Escáner con IA: Análisis de Silueta, Colorimetría y Pinterest")
-    st.write("Sube una foto de tu prenda para que la Inteligencia Artificial analice si favorece tu tipo de cuerpo y te muestre combinaciones estéticas en Pinterest.")
+    st.markdown("### 📸 Escáner con IA: Análisis de Silueta, Colorimetría y Pinterest")
+    st.write("Sube una foto de tu prenda para que la Inteligencia Artificial analice si favorece tu tipo de cuerpo y te muestre combinaciones estéticas.")
 
     col_sel1, col_sel2 = st.columns(2)
     with col_sel1:
-        colorimetria = st.selectbox("Tu subtono de piel / estación cromática:", ["Neutro", "Cálido (Primavera/Otoño)", "Frío (Verano/Invierno)"])
+        colorimetria = st.selectbox("Tu subtono de piel / estación cromática:", ["Neutro", "Cálido (Primavera/Otoño)", "Frío (Verano/Inverno)"])
     with col_sel2:
         silueta_corte = st.selectbox("Preferencia de ajuste del outfit:", ["Holgado / Confort", "Equilibrado", "Estructurado / Definido"])
 
@@ -155,9 +179,9 @@ with tab2:
             
         with col_info:
             st.success("🤖 **Análisis de Inteligencia Artificial Completado:**")
-            st.write(f"• **Análisis de Favorecimiento:** La caída de esta prenda potencia la silueta **{tipo_cuerpo}**.")
-            st.write(f"• **Armonía Cromática:** Compatible con subtono **{colorimetria}**.")
-            st.write(f"• **Adaptación de Estilo:** Alineada al estilo **{estilo_personal}**.")
+            st.write(f"• **Análisis de Favorecimiento:** La caída de esta prenda potencia tu silueta **{tipo_cuerpo}**.")
+            st.write(f"• **Armonía Cromática:** Compatible con tu subtono **{colorimetria}**.")
+            st.write(f"• **Adaptación de Estilo:** Alineada al concepto **{estilo_personal}**.")
             st.write("• **Evaluación Sensorial:** Apto para alta sensibilidad táctil (costuras planas).")
 
         # Enlace dinámico a Pinterest
@@ -165,9 +189,9 @@ with tab2:
         url_pinterest = f"https://www.pinterest.com/search/pins/?q={urllib.parse.quote(query_pinterest)}"
         
         st.write("---")
-        st.subheader("📌 Inspiración Estética en Tiempo Real (Pinterest)")
-        st.markdown(f"La IA ha seleccionado una fuente de combinaciones bonitas para ti. [👉 Haz clic aquí para abrir los mejores tableros de Pinterest para este outfit]({url_pinterest})")
+        st.markdown("#### 📌 Inspiración Estética en Tiempo Real (Pinterest)")
+        st.markdown(f"La IA ha vinculado esta consulta con una base de datos visual en vivo. [👉 Haz clic aquí para abrir los tableros de Pinterest ideales para ti]({url_pinterest})")
 
 # Pie de página
 st.write("---")
-st.caption("EcoArmario Inclusivo — Inteligencia Artificial, Silueta Personalizada, Accesibilidad e Impacto Ambiental.")
+st.markdown("<p style='text-align: center; color: #888888; font-size: 13px;'>EcoArmario Inclusivo — Inteligencia Artificial, Silueta Personalizada, Accesibilidad e Impacto Ambiental.</p>", unsafe_allow_html=True)
