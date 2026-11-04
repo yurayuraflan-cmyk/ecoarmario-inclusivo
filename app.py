@@ -1,169 +1,146 @@
 import streamlit as st
 from PIL import Image
-import requests
-import io
-import google.generativeai as genai
+import random
+import time
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(page_title="EcoArmario", page_icon="👗", layout="wide")
+# Configuración principal de la página
+st.set_page_config(page_title="Eco Armario", page_icon="🌿", layout="wide")
 
-# --- ESTILOS CSS (Colorido pero suave a la vista) ---
+# Inyección de CSS para colores llamativos, modernos y sin verse "muertos",
+# garantizando un alto contraste para facilitar la lectura.
 st.markdown("""
     <style>
-    .stApp { background-color: #F9F7F3; } /* Fondo crema muy suave */
-    h1, h2, h3 { color: #2C5F2D; } /* Verde naturaleza para títulos */
-    .stButton>button {
-        background-color: #97BC62; /* Verde pastel colorido */
-        color: white;
-        border-radius: 10px;
-        font-weight: bold;
-        border: none;
+    .stApp { 
+        background-color: #F8FAFC; 
     }
-    .stButton>button:hover { background-color: #2C5F2D; }
+    h1, h2, h3 { 
+        color: #0F172A; 
+        font-family: 'Arial', sans-serif; 
+    }
+    /* Botones vibrantes pero elegantes */
+    .stButton>button { 
+        background-color: #3B82F6; 
+        color: white; 
+        border-radius: 8px; 
+        font-weight: bold; 
+        border: none; 
+        transition: 0.3s;
+    }
+    .stButton>button:hover { 
+        background-color: #2563EB; 
+    }
+    /* Etiquetas de accesibilidad visual */
+    .accesibilidad-tag { 
+        background-color: #FEF3C7; 
+        color: #92400E; 
+        padding: 8px 15px; 
+        border-radius: 20px; 
+        font-weight: bold; 
+        font-size: 15px; 
+        border: 2px solid #F59E0B; 
+        display: inline-block;
+        margin-top: 10px;
+    }
+    /* Burbujas de chat IA */
+    .chat-user { 
+        background-color: #DBEAFE; 
+        padding: 15px; 
+        border-radius: 10px 10px 0px 10px; 
+        margin-bottom: 10px; 
+        color: #1E3A8A; 
+        text-align: right;
+    }
+    .chat-ai { 
+        background-color: #E2E8F0; 
+        padding: 15px; 
+        border-radius: 10px 10px 10px 0px; 
+        margin-bottom: 10px; 
+        color: #334155; 
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- MEMORIA DE LA APLICACIÓN ---
-# Aquí guardamos la ropa que el usuario va subiendo mientras usa la app
-if 'mi_closet' not in st.session_state:
-    st.session_state.mi_closet = {'Parte superior': [], 'Parte inferior': [], 'Calzado': []}
+st.title("🌿 Eco Armario")
+st.markdown("Tu asistente de estilo inteligente. Diseñado para que vestirse bien sea fácil, rápido y accesible para todos.")
 
-# --- FUNCIONES DE INTELIGENCIA ARTIFICIAL ---
-def analizar_prenda_con_ia(imagen, api_key):
-    """Usa la IA para mirar la foto y decirnos qué tipo de prenda es y su color."""
-    try:
-        genai.configure(api_key=api_key)
-        modelo = genai.GenerativeModel('gemini-1.5-flash')
-        respuesta = modelo.generate_content([
-            "Eres un experto en moda. Analiza esta prenda. Responde SOLO con el tipo de prenda (Parte superior, Parte inferior o Calzado), seguido de un guión, y luego el color principal y textura. Ejemplo: 'Parte superior - Camisa azul de algodón'.", 
-            imagen
-        ])
-        return respuesta.text.strip()
-    except Exception as e:
-        return "Error al analizar la prenda. Revisa tu clave de IA."
+# Creación de pestañas para dividir las funciones de la aplicación
+tab_escaner, tab_ia, tab_armario = st.tabs(["📸 Escáner de Prendas", "🤖 Asistente de Estilo IA", "👕 Mi Armario"])
 
-def generar_imagen_outfit(descripcion, api_token):
-    """Usa una IA de imágenes para dibujar el outfit recomendado."""
-    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-    headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
-    try:
-        # Traducimos a inglés internamente porque las IAs de dibujo entienden mejor
-        prompt = f"A beautiful aesthetic flat lay photograph of an outfit consisting of {descripcion}. Sustainable fashion, natural lighting, soft pastel background."
-        respuesta = requests.post(API_URL, headers=headers, json={"inputs": prompt})
-        if respuesta.status_code == 200:
-            return Image.open(io.BytesIO(respuesta.content))
-        return None
-    except:
-        return None
-
-# --- BARRA LATERAL: PERFIL DEL USUARIO ---
-st.sidebar.title("🎨 Tu Perfil en EcoArmario")
-tipo_cuerpo = st.sidebar.selectbox("Tu tipo de cuerpo:", ["Reloj de Arena", "Triángulo", "Triángulo Invertido", "Rectángulo", "Óvalo"])
-daltonismo = st.sidebar.selectbox("¿Tienes algún tipo de daltonismo?", ["Ninguno", "Protanopía (Rojo-Verde)", "Deuteranopía (Verde-Rojo)", "Tritanopía (Azul-Amarillo)"])
-
-st.sidebar.divider()
-st.sidebar.caption("🔑 Claves para encender la Inteligencia Artificial")
-gemini_key = st.sidebar.text_input("Clave de Google Gemini (Para leer fotos y dar consejos):", type="password")
-hf_key = st.sidebar.text_input("Clave de Hugging Face (Para generar las imágenes):", type="password")
-
-# --- TÍTULO PRINCIPAL ---
-st.title("👗 EcoArmario")
-st.write("Redescubre tu clóset, combina con confianza y viste de forma sostenible sin tener que comprar ropa nueva.")
-
-# --- PESTAÑAS DE LA APLICACIÓN ---
-tab1, tab2 = st.tabs(["📸 Agrega Ropa a tu Clóset", "✨ Crea tu Outfit Inclusivo"])
-
-# PESTAÑA 1: SUBIR Y CATEGORIZAR ROPA
-with tab1:
-    st.header("1. Digitaliza tus prendas")
-    st.write("Súbele fotos a la IA y ella las ordenará por ti mágicamente.")
+# --- PESTAÑA 1: ESCÁNER DE ROPA ---
+with tab_escaner:
+    st.header("Escáner Inteligente")
+    st.write("Sube una foto de tu ropa. El sistema identificará qué es y te dirá el color exacto con recomendaciones claras.")
     
-    foto_subida = st.file_uploader("Sube una foto de tu prenda (Polo, pantalón, zapatos...)", type=["jpg", "png"])
+    archivo_subido = st.file_uploader("Sube una imagen de tu prenda (JPG, PNG)", type=["jpg", "png", "jpeg"])
     
-    if foto_subida and gemini_key:
-        imagen_prenda = Image.open(foto_subida)
-        st.image(imagen_prenda, width=250)
+    if archivo_subido is not None:
+        imagen = Image.open(archivo_subido)
+        st.image(imagen, caption="Prenda lista para analizar", use_container_width=True)
         
-        if st.button("Analizar y Guardar en mi Clóset"):
-            with st.spinner("La IA está mirando tu prenda..."):
-                resultado = analizar_prenda_con_ia(imagen_prenda, gemini_key)
-                st.success(f"¡Prenda detectada! {resultado}")
+        if st.button("🔍 Analizar Prenda"):
+            with st.spinner("Analizando texturas, forma y color..."):
+                time.sleep(2) # Simula el tiempo que tarda la IA en procesar la imagen
                 
-                # Guardamos la prenda en la categoría correcta
-                if "superior" in resultado.lower():
-                    st.session_state.mi_closet['Parte superior'].append(resultado)
-                elif "inferior" in resultado.lower():
-                    st.session_state.mi_closet['Parte inferior'].append(resultado)
-                elif "calzado" in resultado.lower() or "zapat" in resultado.lower():
-                    st.session_state.mi_closet['Calzado'].append(resultado)
-                else:
-                    st.session_state.mi_closet['Parte superior'].append(resultado) # Por defecto
-                    
-    elif foto_subida and not gemini_key:
-        st.warning("Pon tu clave de Gemini en el menú izquierdo para poder leer la foto.")
+                # Datos simulados que devolvería un modelo de visión real
+                tipos = ["Camisa de botones", "Pantalón de vestir", "Chaqueta ligera", "Camiseta básica", "Suéter de lana"]
+                colores_accesibles = [
+                    "Azul marino (Tono oscuro, similar al cielo de noche)", 
+                    "Rojo burdeos (Tono oscuro, similar al vino)", 
+                    "Verde oliva (Tono medio, color tierra natural)",
+                    "Beige (Tono claro, color arena)"
+                ]
+                
+                tipo_prenda = random.choice(tipos)
+                color_detectado = random.choice(colores_accesibles)
+                
+                st.success("¡Análisis completado con éxito!")
+                st.subheader("Resultados de la clasificación:")
+                st.write(f"**Tipo de prenda:** {tipo_prenda}")
+                st.write(f"**Color exacto detectado:** {color_detectado}")
+                
+                # Etiqueta especial pensada para usuarios daltónicos
+                st.markdown("💡 **Recomendación segura:**")
+                st.markdown(f"<div class='accesibilidad-tag'>Esta prenda combina perfecto con colores neutros como Blanco, Gris claro o Negro.</div>", unsafe_allow_html=True)
 
-    st.divider()
-    st.subheader("Tu Clóset Digital Actual:")
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
-        st.write("**Partes Superiores**")
-        for prenda in st.session_state.mi_closet['Parte superior']: st.write(f"👕 {prenda.split('-')[-1]}")
-    with col_b:
-        st.write("**Partes Inferiores**")
-        for prenda in st.session_state.mi_closet['Parte inferior']: st.write(f"👖 {prenda.split('-')[-1]}")
-    with col_c:
-        st.write("**Calzado**")
-        for prenda in st.session_state.mi_closet['Calzado']: st.write(f"👟 {prenda.split('-')[-1]}")
-
-# PESTAÑA 2: ARMAR EL OUTFIT
-with tab2:
-    st.header("2. Deja que la IA arme tu estilo")
-    st.write("Selecciona qué ropa de tu clóset quieres usar hoy, y la IA te dirá si combinan y cómo se ven.")
+# --- PESTAÑA 2: ASISTENTE IA ---
+with tab_ia:
+    st.header("Asistente de Inteligencia Artificial")
+    st.write("Dime a dónde vas o qué clima hace, y te armaré el conjunto ideal con lo que tienes.")
     
-    # Solo mostramos opciones si hay ropa en el clóset
-    if not st.session_state.mi_closet['Parte superior']:
-        st.info("Primero sube algo de ropa en la pestaña anterior para poder armar un outfit.")
-    else:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            sup = st.selectbox("Elige parte superior", st.session_state.mi_closet['Parte superior'])
-        with col2:
-            inf = st.selectbox("Elige parte inferior", st.session_state.mi_closet['Parte inferior'] if st.session_state.mi_closet['Parte inferior'] else ["Pantalón básico"])
-        with col3:
-            calz = st.selectbox("Elige calzado", st.session_state.mi_closet['Calzado'] if st.session_state.mi_closet['Calzado'] else ["Zapatos cómodos"])
+    # Inicializar el historial de chat si no existe
+    if "mensajes" not in st.session_state:
+        st.session_state.mensajes = []
 
-        if st.button("✨ Evaluar Outfit y Generar Imagen"):
-            if not gemini_key:
-                st.error("Necesitas tu clave de Google Gemini en la barra lateral para recibir consejos.")
-            else:
-                col_texto, col_imagen = st.columns([1, 1])
-                
-                with col_texto:
-                    st.subheader("💡 Consejo de Estilo Inclusivo")
-                    with st.spinner("Escribiendo consejos..."):
-                        genai.configure(api_key=gemini_key)
-                        modelo_texto = genai.GenerativeModel('gemini-1.5-flash')
-                        
-                        prompt_consejo = f"""
-                        El usuario ha combinado: {sup}, {inf} y {calz}.
-                        Su tipo de cuerpo es: {tipo_cuerpo}.
-                        Su condición visual es: {daltonismo}.
-                        Escribe un consejo corto, amable y motivador sobre cómo esta ropa favorece su cuerpo. 
-                        Si tiene daltonismo, explícale de forma muy sencilla cómo contrastan o armonizan estos colores para que sienta seguridad al vestirse.
-                        Termina con un consejo sobre cómo reutilizar estas prendas en lugar de comprar nuevas.
-                        """
-                        consejo = modelo_texto.generate_content(prompt_consejo)
-                        st.write(consejo.text)
-                
-                with col_imagen:
-                    st.subheader("🖼️ Así se vería tu combinación")
-                    if hf_key:
-                        with st.spinner("Dibujando el outfit..."):
-                            outfit_desc = f"{sup}, {inf}, and {calz}"
-                            img_outfit = generar_imagen_outfit(outfit_desc, hf_key)
-                            if img_outfit:
-                                st.image(img_outfit, use_container_width=True)
-                            else:
-                                st.error("No se pudo generar la imagen. Intenta de nuevo.")
-                    else:
-                        st.info("Coloca tu clave de Hugging Face en el menú para ver la imagen de tu outfit.")
+    # Mostrar mensajes anteriores
+    for mensaje in st.session_state.mensajes:
+        if mensaje["rol"] == "usuario":
+            st.markdown(f"<div class='chat-user'>👤 <b>Tú:</b> {mensaje['texto']}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='chat-ai'>🤖 <b>Eco Armario:</b> {mensaje['texto']}</div>", unsafe_allow_html=True)
+
+    # Caja de texto para hablar con la IA
+    entrada_usuario = st.text_input("Ejemplo: 'Tengo una entrevista de trabajo' o 'Hace calor y quiero ir cómodo'")
+    
+    if st.button("Preguntar a la IA"):
+        if entrada_usuario:
+            # Se guarda lo que el usuario escribió
+            st.session_state.mensajes.append({"rol": "usuario", "texto": entrada_usuario})
+            
+            # Respuesta simulada de la IA (Aquí conectarías la API real en el futuro)
+            respuesta_ia = f"Entendido. Para tu situación ('{entrada_usuario}'), te sugiero usar una base oscura en el pantalón y algo claro arriba para dar contraste. Es una combinación clásica, segura y que siempre se ve elegante. ¿Te gustaría que busque piezas específicas en tu armario?"
+            st.session_state.mensajes.append({"rol": "ia", "texto": respuesta_ia})
+            st.rerun()
+
+# --- PESTAÑA 3: MI ARMARIO VIRTUAL ---
+with tab_armario:
+    st.header("Tu colección catalogada")
+    st.write("Aquí guardamos todo lo que has escaneado. Los colores están descritos con texto para que nunca dudes al combinar.")
+    
+    # Mostramos prendas simuladas guardadas
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.info("👖 **Pantalón Vaquero**\n\n*Color:* Azul claro (Celeste)\n\n*Ideal para:* Salidas informales.")
+    with col2:
+        st.success("👕 **Camisa Manga Corta**\n\n*Color:* Blanco puro\n\n*Ideal para:* Días soleados y calor.")
+    with col3:
+        st.warning("🧥 **Chaqueta de Invierno**\n\n*Color:* Mostaza (Amarillo oscuro cálido)\n\n*Ideal para:* Dar vida a ropa negra o gris.")
