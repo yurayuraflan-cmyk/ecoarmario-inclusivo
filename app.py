@@ -1,196 +1,169 @@
 import streamlit as st
-import random
-import urllib.parse
 from PIL import Image
+import requests
+import io
+import google.generativeai as genai
 
-st.set_page_config(
-    page_title="EcoArmario Inclusivo",
-    page_icon="🌱",
-    layout="wide"
-)
+# --- CONFIGURACIÓN DE LA PÁGINA ---
+st.set_page_config(page_title="EcoArmario", page_icon="👗", layout="wide")
 
-# Barra lateral - Perfil y Accesibilidad Universal
-st.sidebar.markdown("### 🎨 Tu Perfil Personalizado")
-estilo_personal = st.sidebar.selectbox(
-    "Estilo preferido:",
-    ["Casual / Urbano", "Minimalista / Neutro", "Elegante / Sofisticado", "Bohemio / Creativo", "Oversize / Streetwear"]
-)
-
-tipo_cuerpo = st.sidebar.selectbox(
-    "Tipo de cuerpo / silueta:",
-    ["Reloj de Arena (Equilibrado)", "Rectángulo (Líneas rectas)", "Triángulo / Pera", "Triángulo Invertido", "Óvalo / Manzana"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 👁️ Accesibilidad Visual y Daltonismo")
-modo_daltonismo = st.sidebar.selectbox(
-    "Filtro Adaptativo de Daltonismo:",
-    [
-        "Ninguno (Estándar)",
-        "Protanopia (Ceguera al rojo)",
-        "Deuteranopia (Ceguera al verde)",
-        "Tritanopia (Ceguera al azul/amarillo)"
-    ]
-)
-
-modo_neuro = st.sidebar.checkbox("🧠 Modo Antiestrés Sensorial (Bajo estímulo visual)")
-
-# Estilos CSS dinámicos según el daltonismo seleccionado o modo sensorial
-css_estilos = """
+# --- ESTILOS CSS (Colorido pero suave a la vista) ---
+st.markdown("""
     <style>
-    .stApp {
-        background-color: #F8F9FA;
-        color: #212529;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #E9ECEF;
-    }
-    [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] p {
-        color: #1B5E20 !important;
-        font-weight: 600;
-    }
+    .stApp { background-color: #F9F7F3; } /* Fondo crema muy suave */
+    h1, h2, h3 { color: #2C5F2D; } /* Verde naturaleza para títulos */
     .stButton>button {
-        width: 100%;
-        border-radius: 12px;
-        height: 3.4em;
-        background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
-        color: white !important;
+        background-color: #97BC62; /* Verde pastel colorido */
+        color: white;
+        border-radius: 10px;
         font-weight: bold;
         border: none;
-        box-shadow: 0 4px 14px rgba(46, 125, 50, 0.4);
     }
-    .card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
-    }
+    .stButton>button:hover { background-color: #2C5F2D; }
     </style>
-"""
+""", unsafe_allow_html=True)
 
-# Aplicar cambios visuales drásticos si selecciona daltonismo
-if modo_daltonismo != "Ninguno (Estándar)":
-    css_estilos += f"""
-    <style>
-    .stApp {{
-        background-color: #0A192F !important;
-        color: #64FFDA !important;
-    }}
-    p, h1, h2, h3, label, span {{
-        color: #64FFDA !important;
-    }}
-    [data-testid="stSidebar"] {{
-        background-color: #020C1B !important;
-    }}
-    [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {{
-        color: #64FFDA !important;
-    }}
-    </style>
-    """
+# --- MEMORIA DE LA APLICACIÓN ---
+# Aquí guardamos la ropa que el usuario va subiendo mientras usa la app
+if 'mi_closet' not in st.session_state:
+    st.session_state.mi_closet = {'Parte superior': [], 'Parte inferior': [], 'Calzado': []}
 
-if modo_neuro and modo_daltonismo == "Ninguno (Estándar)":
-    css_estilos += """
-    <style>
-    .stApp { background-color: #EEF4F0 !important; }
-    </style>
-    """
+# --- FUNCIONES DE INTELIGENCIA ARTIFICIAL ---
+def analizar_prenda_con_ia(imagen, api_key):
+    """Usa la IA para mirar la foto y decirnos qué tipo de prenda es y su color."""
+    try:
+        genai.configure(api_key=api_key)
+        modelo = genai.GenerativeModel('gemini-1.5-flash')
+        respuesta = modelo.generate_content([
+            "Eres un experto en moda. Analiza esta prenda. Responde SOLO con el tipo de prenda (Parte superior, Parte inferior o Calzado), seguido de un guión, y luego el color principal y textura. Ejemplo: 'Parte superior - Camisa azul de algodón'.", 
+            imagen
+        ])
+        return respuesta.text.strip()
+    except Exception as e:
+        return "Error al analizar la prenda. Revisa tu clave de IA."
 
-st.markdown(css_estilos, unsafe_allow_html=True)
+def generar_imagen_outfit(descripcion, api_token):
+    """Usa una IA de imágenes para dibujar el outfit recomendado."""
+    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+    headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
+    try:
+        # Traducimos a inglés internamente porque las IAs de dibujo entienden mejor
+        prompt = f"A beautiful aesthetic flat lay photograph of an outfit consisting of {descripcion}. Sustainable fashion, natural lighting, soft pastel background."
+        respuesta = requests.post(API_URL, headers=headers, json={"inputs": prompt})
+        if respuesta.status_code == 200:
+            return Image.open(io.BytesIO(respuesta.content))
+        return None
+    except:
+        return None
 
-# Avisos visuales en pantalla
-if modo_daltonismo != "Ninguno (Estándar)":
-    st.warning(f"👁️ **Filtro Activo para {modo_daltonismo}:** Interfaz adaptada con paleta de alto contraste optimizada para evitar confusión de colores.")
+# --- BARRA LATERAL: PERFIL DEL USUARIO ---
+st.sidebar.title("🎨 Tu Perfil en EcoArmario")
+tipo_cuerpo = st.sidebar.selectbox("Tu tipo de cuerpo:", ["Reloj de Arena", "Triángulo", "Triángulo Invertido", "Rectángulo", "Óvalo"])
+daltonismo = st.sidebar.selectbox("¿Tienes algún tipo de daltonismo?", ["Ninguno", "Protanopía (Rojo-Verde)", "Deuteranopía (Verde-Rojo)", "Tritanopía (Azul-Amarillo)"])
 
-if modo_neuro:
-    st.info("🧠 **Modo Antiestrés Sensorial Activo:** Estímulos visuales reducidos.")
+st.sidebar.divider()
+st.sidebar.caption("🔑 Claves para encender la Inteligencia Artificial")
+gemini_key = st.sidebar.text_input("Clave de Google Gemini (Para leer fotos y dar consejos):", type="password")
+hf_key = st.sidebar.text_input("Clave de Hugging Face (Para generar las imágenes):", type="password")
 
-# Encabezado Principal
-st.markdown("<h1 style='text-align: center;'>🌱 EcoArmario Inclusivo</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; font-size: 17px;'>IA de Moda Sostenible • Silueta <b>{tipo_cuerpo.split(' ')[0]}</b> • Accesibilidad Universal</p>", unsafe_allow_html=True)
+# --- TÍTULO PRINCIPAL ---
+st.title("👗 EcoArmario")
+st.write("Redescubre tu clóset, combina con confianza y viste de forma sostenible sin tener que comprar ropa nueva.")
 
-st.write("---")
+# --- PESTAÑAS DE LA APLICACIÓN ---
+tab1, tab2 = st.tabs(["📸 Agrega Ropa a tu Clóset", "✨ Crea tu Outfit Inclusivo"])
 
-tab1, tab2, tab3 = st.tabs(["👔 Armario Cápsula", "📸 Escáner IA & Pinterest", "🧩 Panel Inclusivo & Daltonismo"])
-
+# PESTAÑA 1: SUBIR Y CATEGORIZAR ROPA
 with tab1:
-    st.markdown("### 👔 Diseña tu Armario Cápsula Sostenible")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        prenda_superior = st.selectbox("Parte superior:", ["Polera básica de algodón orgánico", "Camisa fluida lino", "Polo oversize suave"])
-    with col2:
-        prenda_inferior = st.selectbox("Parte inferior:", ["Pantalón elástico ajustable", "Falda midi tiro alto", "Pantalón holgado confort"])
-    with col3:
-        calzado = st.selectbox("Calzado:", ["Zapatillas urbanas ecológicas", "Mocasines ergonómicos"])
-
-    st.markdown("---")
-    if st.button("✨ Generar Combinación Inteligente"):
-        c_outfit, c_impacto = st.columns([2, 1])
+    st.header("1. Digitaliza tus prendas")
+    st.write("Súbele fotos a la IA y ella las ordenará por ti mágicamente.")
+    
+    foto_subida = st.file_uploader("Sube una foto de tu prenda (Polo, pantalón, zapatos...)", type=["jpg", "png"])
+    
+    if foto_subida and gemini_key:
+        imagen_prenda = Image.open(foto_subida)
+        st.image(imagen_prenda, width=250)
         
-        with c_outfit:
-            st.success("¡Outfit optimizado correctamente!")
-            st.markdown(f"**Estilo:** {estilo_personal} | **Silueta:** {tipo_cuerpo}")
-            st.markdown(f"• **Top:** {prenda_superior}\n• **Bottom:** {prenda_inferior}\n• **Calzado:** {calzado}")
-            st.info(f"💡 **IA de Favorecimiento:** Corte validado para equilibrar la proporción visual de la silueta **{tipo_cuerpo}**.")
+        if st.button("Analizar y Guardar en mi Clóset"):
+            with st.spinner("La IA está mirando tu prenda..."):
+                resultado = analizar_prenda_con_ia(imagen_prenda, gemini_key)
+                st.success(f"¡Prenda detectada! {resultado}")
+                
+                # Guardamos la prenda en la categoría correcta
+                if "superior" in resultado.lower():
+                    st.session_state.mi_closet['Parte superior'].append(resultado)
+                elif "inferior" in resultado.lower():
+                    st.session_state.mi_closet['Parte inferior'].append(resultado)
+                elif "calzado" in resultado.lower() or "zapat" in resultado.lower():
+                    st.session_state.mi_closet['Calzado'].append(resultado)
+                else:
+                    st.session_state.mi_closet['Parte superior'].append(resultado) # Por defecto
+                    
+    elif foto_subida and not gemini_key:
+        st.warning("Pon tu clave de Gemini en el menú izquierdo para poder leer la foto.")
 
-        with c_impacto:
-            agua = random.randint(1500, 2400)
-            st.metric(label="💧 Agua Ahorrada", value=f"{agua} L", delta="vs Fast Fashion")
-            st.caption("Ahorro estimado por reutilización inteligente.")
+    st.divider()
+    st.subheader("Tu Clóset Digital Actual:")
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.write("**Partes Superiores**")
+        for prenda in st.session_state.mi_closet['Parte superior']: st.write(f"👕 {prenda.split('-')[-1]}")
+    with col_b:
+        st.write("**Partes Inferiores**")
+        for prenda in st.session_state.mi_closet['Parte inferior']: st.write(f"👖 {prenda.split('-')[-1]}")
+    with col_c:
+        st.write("**Calzado**")
+        for prenda in st.session_state.mi_closet['Calzado']: st.write(f"👟 {prenda.split('-')[-1]}")
 
+# PESTAÑA 2: ARMAR EL OUTFIT
 with tab2:
-    st.markdown("### 📸 Escáner IA, Análisis Cromático & Pinterest Inspo")
+    st.header("2. Deja que la IA arme tu estilo")
+    st.write("Selecciona qué ropa de tu clóset quieres usar hoy, y la IA te dirá si combinan y cómo se ven.")
     
-    c_s1, c_s2 = st.columns(2)
-    with c_s1:
-        colorimetria = st.selectbox("Subtono de piel:", ["Neutro", "Cálido", "Frío"])
-    with c_s2:
-        ajuste = st.selectbox("Nivel de ajuste de prenda:", ["Holgado (Sin presión)", "Equilibrado"])
+    # Solo mostramos opciones si hay ropa en el clóset
+    if not st.session_state.mi_closet['Parte superior']:
+        st.info("Primero sube algo de ropa en la pestaña anterior para poder armar un outfit.")
+    else:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            sup = st.selectbox("Elige parte superior", st.session_state.mi_closet['Parte superior'])
+        with col2:
+            inf = st.selectbox("Elige parte inferior", st.session_state.mi_closet['Parte inferior'] if st.session_state.mi_closet['Parte inferior'] else ["Pantalón básico"])
+        with col3:
+            calz = st.selectbox("Elige calzado", st.session_state.mi_closet['Calzado'] if st.session_state.mi_closet['Calzado'] else ["Zapatos cómodos"])
 
-    foto = st.file_uploader("Sube la foto de tu prenda (JPG, PNG)", type=["jpg", "jpeg", "png"])
-
-    if foto:
-        img = Image.open(foto)
-        col_i1, col_i2 = st.columns(2)
-        with col_i1:
-            st.image(img, caption="Prenda analizada", use_column_width=True)
-        with col_i2:
-            st.success("🤖 **Diagnóstico de IA:**")
-            st.write(f"• **Compatibilidad Cromática:** Armoniza con subtono {colorimetria}.")
-            st.write(f"• **Evaluación Ergonómica:** Ajuste {ajuste} recomendado para evitar marcas en la piel.")
-            st.write("• **Textura:** Validada para evitar fricción táctil.")
-
-        q_pin = f"aesthetic outfit {estilo_personal} {tipo_cuerpo.split(' ')[0]} {colorimetria}"
-        url_pin = f"https://www.pinterest.com/search/pins/?q={urllib.parse.quote(q_pin)}"
-        st.markdown("---")
-        st.markdown(f"📌 **Base de Datos Visual (Pinterest):** [👉 Ver combinaciones estéticas en vivo]({url_pin})")
-
-with tab3:
-    st.markdown("### 🧩 Accesibilidad Total: Neurodivergencia y Daltonismo")
-    st.write("Explicación de impacto para el jurado:")
-
-    col_h1, col_h2 = st.columns(2)
-    
-    with col_h1:
-        st.markdown("""
-        <div class="card">
-            <h4>🎨 Soporte para Daltonismo</h4>
-            <p>Muchas pessoas con daltonismo (pro, deute o tritanopia) sufren al combinar prendas porque confunden tonalidades rojas, verdes o azules.</p>
-            <p><b>Solución en la App:</b> Al activar el filtro de daltonismo en la barra lateral, la interfaz reasigna contrastes seguros (azules cian y oscuros) y la IA etiqueta explícitamente los colores por nombre y compatibilidad para evitar errores al vestir.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_h2:
-        st.markdown("""
-        <div class="card">
-            <h4>🏷️ Confort Sensorial y Táctil</h4>
-            <p>Prevención de crisis por costuras o etiquetas rígidas en personas con autismo o TDAH.</p>
-            <p><b>Solución en la App:</b> Filtrado de ropa adaptativa y priorización de telas suaves con texturas hipoalergénicas.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-st.write("---")
-st.markdown("<p style='text-align: center; font-size: 13px;'>EcoArmario Inclusivo — Tecnología, Sostenibilidad e Inclusión Universal.</p>", unsafe_allow_html=True)
+        if st.button("✨ Evaluar Outfit y Generar Imagen"):
+            if not gemini_key:
+                st.error("Necesitas tu clave de Google Gemini en la barra lateral para recibir consejos.")
+            else:
+                col_texto, col_imagen = st.columns([1, 1])
+                
+                with col_texto:
+                    st.subheader("💡 Consejo de Estilo Inclusivo")
+                    with st.spinner("Escribiendo consejos..."):
+                        genai.configure(api_key=gemini_key)
+                        modelo_texto = genai.GenerativeModel('gemini-1.5-flash')
+                        
+                        prompt_consejo = f"""
+                        El usuario ha combinado: {sup}, {inf} y {calz}.
+                        Su tipo de cuerpo es: {tipo_cuerpo}.
+                        Su condición visual es: {daltonismo}.
+                        Escribe un consejo corto, amable y motivador sobre cómo esta ropa favorece su cuerpo. 
+                        Si tiene daltonismo, explícale de forma muy sencilla cómo contrastan o armonizan estos colores para que sienta seguridad al vestirse.
+                        Termina con un consejo sobre cómo reutilizar estas prendas en lugar de comprar nuevas.
+                        """
+                        consejo = modelo_texto.generate_content(prompt_consejo)
+                        st.write(consejo.text)
+                
+                with col_imagen:
+                    st.subheader("🖼️ Así se vería tu combinación")
+                    if hf_key:
+                        with st.spinner("Dibujando el outfit..."):
+                            outfit_desc = f"{sup}, {inf}, and {calz}"
+                            img_outfit = generar_imagen_outfit(outfit_desc, hf_key)
+                            if img_outfit:
+                                st.image(img_outfit, use_container_width=True)
+                            else:
+                                st.error("No se pudo generar la imagen. Intenta de nuevo.")
+                    else:
+                        st.info("Coloca tu clave de Hugging Face en el menú para ver la imagen de tu outfit.")
