@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import random
 import colorsys
+import json
 from PIL import Image
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
@@ -56,7 +57,15 @@ TONOS_PIEL = {
     "Ébano Profundo": "#59331E"
 }
 
-# Funciones auxiliares de color y diseño
+PRESETS_SILUETA = {
+    "Reloj de arena / Equilibrado": {"hombros": 1.05, "pecho": 1.05, "cintura": 0.78, "cadera": 1.06, "complexion": 1.0},
+    "Pera / Triángulo": {"hombros": 0.88, "pecho": 0.90, "cintura": 0.85, "cadera": 1.22, "complexion": 1.0},
+    "Triángulo Invertido": {"hombros": 1.25, "pecho": 1.15, "cintura": 0.88, "cadera": 0.88, "complexion": 1.0},
+    "Rectángulo": {"hombros": 1.00, "pecho": 0.96, "cintura": 0.96, "cadera": 0.98, "complexion": 0.98},
+    "Ovalado / Manzana": {"hombros": 1.02, "pecho": 1.16, "cintura": 1.20, "cadera": 1.05, "complexion": 1.12}
+}
+
+# Funciones auxiliares
 def hex_a_rgb(hex_str):
     if not isinstance(hex_str, str):
         return (180, 160, 140)
@@ -74,13 +83,6 @@ def rgb_a_hex(rgb):
         max(0, min(255, int(rgb[1]))),
         max(0, min(255, int(rgb[2])))
     )
-
-def ajustar_luz_color(hex_str, factor_luz):
-    r, g, b = [x / 255.0 for x in hex_a_rgb(hex_str)]
-    h, l, s = colorsys.rgb_to_hls(r, g, b)
-    l_nuevo = max(0.05, min(0.95, l * factor_luz))
-    r2, g2, b2 = colorsys.hls_to_rgb(h, l_nuevo, s)
-    return rgb_a_hex((r2 * 255, g2 * 255, b2 * 255))
 
 def inferir_diseno(nombre, categoria):
     n = str(nombre).lower()
@@ -119,7 +121,7 @@ def calcular_armonia_colores(hex1, hex2):
     if diff_hue > 180:
         diff_hue = 360 - diff_hue
     if diff_hue < 22:
-        return "Armonía Monocromática — Estiliza tu altura (96% Compatible)"
+        return "Armonía Monocromática — Estiliza tu figura (96% Compatible)"
     elif diff_hue < 58:
         return "Armonía Análoga Suave (93% Compatible)"
     elif 150 <= diff_hue <= 210:
@@ -129,23 +131,21 @@ def calcular_armonia_colores(hex1, hex2):
 def obtener_consejo_altura(altura_cm, genero):
     if altura_cm < 162:
         return (
-            f"📏 **Estatura Baja ({altura_cm} cm):** Te favorecen los **looks monocromáticos** (tonos parecidos arriba y abajo) "
-            "porque crean una línea vertical continua que alarga tus piernas. Prioriza **Camisas con cuello en V**, "
-            "**Pantalones Sastre de tiro alto** y evita cortes muy anchos que resten altura."
+            f"📏 **Estatura Baja ({altura_cm} cm):** Te favorecen las **combinaciones monocromáticas** o de tonos similares "
+            "para alargar visualmente tu silueta. Prioriza **Pantalones Sastre o Jeans de tiro alto** y evita prendas demasiado anchas."
         )
     elif altura_cm <= 175:
         return (
-            f"📏 **Estatura Media ({altura_cm} cm):** Tienes una proporción muy versátil. Puedes alternar tanto **Blazers y Suéteres** "
-            "como **Jeans o Pantalones Rectos**, jugando libremente con contrastes de color y superposición de prendas."
+            f"📏 **Estatura Media ({altura_cm} cm):** Tu proporción te permite combinar libremente tanto **Camisas y Blazers** "
+            "como **Pantalones Rectos o Anchos**, jugando con bloques de color equilibrados."
         )
     else:
         return (
-            f"📏 **Estatura Alta ({altura_cm} cm):** Tu altura luce increíble con **bloques de color contrastantes** entre la parte "
-            "superior e inferior (por ejemplo, tonos claros arriba y oscuros abajo). Te quedan muy bien los **Pantalones Anchos o Jeans**, "
-            "**Blazers estructurados**, **Suéteres tejidos** y **Botines o Zapatillas**."
+            f"📏 **Estatura Alta ({altura_cm} cm):** Te lucen excelente los **contrastes de color marcados** entre el top y el pantalón, "
+            "así como **Blazers con solapa**, **Suéteres tejidos** y **Pantalones Anchos o Jeans**."
         )
 
-# 3. AUTORREPARACIÓN DE SESIÓN
+# 3. AUTORREPARACIÓN DE SESIÓN (Evita KeyError)
 PERFIL_PREDETERMINADO = {
     "genero": "Femenino",
     "altura_cm": 165,
@@ -153,7 +153,12 @@ PERFIL_PREDETERMINADO = {
     "tono_nombre": "Trigueño Claro",
     "piel_hex": "#E8B993",
     "subtono": "Cálido (Dorado / Melocotón)",
-    "cabello_hex": "#3B2618"
+    "cabello_hex": "#3B2618",
+    "molde_complexion": 1.0,
+    "molde_hombros": 1.05,
+    "molde_pecho": 1.05,
+    "molde_cintura": 0.78,
+    "molde_cadera": 1.06
 }
 
 if 'perfil' not in st.session_state:
@@ -171,10 +176,11 @@ if 'armario' not in st.session_state:
         {"id": 4, "nombre": "Blazer Estructurado Topo", "categoria": "Parte Superior", "diseno": "Blazer / Casaca (Con Solapa)", "color": "Topo / Taupe", "hex": "#8B7D70", "material": "Algodón/Lino", "usos": 7, "agua_l": 3800, "co2_kg": 8.5},
         {"id": 5, "nombre": "Pantalón Chino Marrón", "categoria": "Parte Inferior", "diseno": "Pantalón Sastre / Chino (Recto)", "color": "Marrón Café", "hex": "#6F4E37", "material": "Algodón", "usos": 15, "agua_l": 6000, "co2_kg": 12.0},
         {"id": 6, "nombre": "Jeans Clásicos Azules", "categoria": "Parte Inferior", "diseno": "Jeans / Denim (Con Bolsillos)", "color": "Azul Marino", "hex": "#1D2951", "material": "Denim", "usos": 25, "agua_l": 8500, "co2_kg": 18.0},
-        {"id": 7, "nombre": "Pantalón Holgado Arena", "categoria": "Parte Inferior", "diseno": "Pantalón Ancho / Palazzo", "color": "Beige Arena", "hex": "#E1D4BC", "material": "Lino", "usos": 11, "agua_l": 5000, "co2_kg": 10.5},
-        {"id": 8, "nombre": "Mocasines de Cuero", "categoria": "Calzado", "diseno": "Mocasines / Zapatos de Vestir", "color": "Marrón Chocolate", "hex": "#4B3020", "material": "Cuero", "usos": 30, "agua_l": 7000, "co2_kg": 14.0},
-        {"id": 9, "nombre": "Zapatillas de Lona", "categoria": "Calzado", "diseno": "Zapatillas Urbanas (Con Pasadores)", "color": "Crema", "hex": "#F5EEDC", "material": "Lona", "usos": 18, "agua_l": 2800, "co2_kg": 6.0},
-        {"id": 10, "nombre": "Botines Terracota", "categoria": "Calzado", "diseno": "Botines / Botas", "color": "Terracota", "hex": "#B4553C", "material": "Cuero Vegano", "usos": 14, "agua_l": 4500, "co2_kg": 9.5},
+        {"id": 7, "nombre": "Pantalón Palazzo Arena", "categoria": "Parte Inferior", "diseno": "Pantalón Ancho / Palazzo", "color": "Beige Arena", "hex": "#E1D4BC", "material": "Lino", "usos": 11, "agua_l": 5000, "co2_kg": 10.5},
+        {"id": 8, "nombre": "Bermuda / Falda Terracota", "categoria": "Parte Inferior", "diseno": "Bermuda / Falda Corta", "color": "Terracota", "hex": "#B4553C", "material": "Algodón", "usos": 9, "agua_l": 3500, "co2_kg": 7.0},
+        {"id": 9, "nombre": "Mocasines de Cuero", "categoria": "Calzado", "diseno": "Mocasines / Zapatos de Vestir", "color": "Marrón Chocolate", "hex": "#4B3020", "material": "Cuero", "usos": 30, "agua_l": 7000, "co2_kg": 14.0},
+        {"id": 10, "nombre": "Zapatillas de Lona", "categoria": "Calzado", "diseno": "Zapatillas Urbanas (Con Pasadores)", "color": "Crema", "hex": "#F5EEDC", "material": "Lona", "usos": 18, "agua_l": 2800, "co2_kg": 6.0},
+        {"id": 11, "nombre": "Botines de Cuero Negro", "categoria": "Calzado", "diseno": "Botines / Botas", "color": "Negro Ónix", "hex": "#222222", "material": "Cuero Vegano", "usos": 14, "agua_l": 4500, "co2_kg": 9.5},
     ]
 else:
     for prenda in st.session_state.armario:
@@ -187,7 +193,7 @@ else:
 
 if 'mensajes_ia' not in st.session_state:
     st.session_state.mensajes_ia = [
-        {"rol": "assistant", "texto": "¡Hola! Soy tu estilista 3D de EcoArmario. Ahora tomo en cuenta tu género, tu altura en centímetros, tu silueta y el diseño de cada prenda. ¿Qué combinación quieres probar hoy?"}
+        {"rol": "assistant", "texto": "¡Hola! Soy tu estilista 3D de EcoArmario. Ahora el maniquí tiene volumen 3D real al rotar, cuerpo moldeable y cambia el diseño y color de cada prenda según la recomendación. ¿Para qué ocasión quieres vestir hoy?"}
     ]
 
 # 4. BARRA LATERAL Y ACCESIBILIDAD
@@ -233,8 +239,8 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# 5. MOTOR DE AVATAR 3D CON ROTACIÓN 360°, GÉNERO, ALTURA Y DISEÑOS DE ROPA
-def renderizar_avatar_3d(top_prenda, bottom_prenda, shoes_prenda, perfil, id_unico="av1", altura_px=600):
+# 5. MOTOR DE AVATAR 3D REAL (THREE.JS WEBGL) CON VOLUMEN 360°, ROPA DINÁMICA Y TAMAÑO MOLDEABLE
+def renderizar_avatar_3d(top_prenda, bottom_prenda, shoes_prenda, perfil, id_unico="av3d", altura_px=620):
     genero = perfil.get("genero", "Femenino")
     altura_cm = int(perfil.get("altura_cm", 165))
     cuerpo = perfil.get("cuerpo", "Reloj de arena / Equilibrado")
@@ -243,231 +249,45 @@ def renderizar_avatar_3d(top_prenda, bottom_prenda, shoes_prenda, perfil, id_uni
     subtono = perfil.get("subtono", "Cálido (Dorado / Melocotón)")
     cabello_hex = perfil.get("cabello_hex", "#3B2618")
 
-    # Escala vertical proporcional a la estatura (140 cm a 200 cm)
-    escala_altura = 0.88 + ((altura_cm - 140) / 60.0) * 0.18
-    escala_altura = max(0.86, min(1.06, escala_altura))
-
-    # Proporciones anatómicas según Género + Tipo de Cuerpo
-    es_masc = (genero == "Masculino")
-    if "Reloj de arena" in cuerpo:
-        sh_w, ch_w, wa_w, hi_w = (62, 54, 44, 50) if es_masc else (54, 48, 33, 55)
-    elif "Pera" in cuerpo:
-        sh_w, ch_w, wa_w, hi_w = (50, 48, 44, 58) if es_masc else (44, 41, 35, 63)
-    elif "Invertido" in cuerpo:
-        sh_w, ch_w, wa_w, hi_w = (68, 58, 43, 44) if es_masc else (62, 52, 39, 43)
-    elif "Rectángulo" in cuerpo:
-        sh_w, ch_w, wa_w, hi_w = (58, 53, 50, 50) if es_masc else (50, 45, 43, 47)
-    else:  # Ovalado / Manzana
-        sh_w, ch_w, wa_w, hi_w = (58, 60, 62, 54) if es_masc else (52, 55, 58, 53)
-
-    # Matiz de piel
+    # Matiz de piel según subtono
     r_p, g_p, b_p = hex_a_rgb(piel_hex)
     if "Cálido" in subtono:
-        piel_base = rgb_a_hex((r_p + 6, g_p + 2, b_p - 5))
+        piel_final = rgb_a_hex((r_p + 6, g_p + 2, b_p - 5))
     elif "Frío" in subtono:
-        piel_base = rgb_a_hex((r_p + 3, g_p - 2, b_p + 6))
+        piel_final = rgb_a_hex((r_p + 3, g_p - 2, b_p + 6))
     else:
-        piel_base = piel_hex
+        piel_final = piel_hex
 
-    piel_luz = ajustar_luz_color(piel_base, 1.18)
-    piel_sombra = ajustar_luz_color(piel_base, 0.78)
-    piel_oscura = ajustar_luz_color(piel_base, 0.60)
-
-    cabello_luz = ajustar_luz_color(cabello_hex, 1.35)
-    cabello_sombra = ajustar_luz_color(cabello_hex, 0.65)
-
-    # Colores e iluminación 3D de las prendas
-    top_hex = top_prenda.get("hex", "#C19A6B")
-    top_luz = ajustar_luz_color(top_hex, 1.22)
-    top_sombra = ajustar_luz_color(top_hex, 0.70)
-    top_diseno = top_prenda.get("diseno", inferir_diseno(top_prenda.get("nombre", ""), "Parte Superior"))
-
-    bot_hex = bottom_prenda.get("hex", "#6F4E37")
-    bot_luz = ajustar_luz_color(bot_hex, 1.20)
-    bot_sombra = ajustar_luz_color(bot_hex, 0.68)
-    bot_diseno = bottom_prenda.get("diseno", inferir_diseno(bottom_prenda.get("nombre", ""), "Parte Inferior"))
-
-    sho_hex = shoes_prenda.get("hex", "#4B3020")
-    sho_luz = ajustar_luz_color(sho_hex, 1.25)
-    sho_sombra = ajustar_luz_color(sho_hex, 0.60)
-    sho_diseno = shoes_prenda.get("diseno", inferir_diseno(shoes_prenda.get("nombre", ""), "Calzado"))
-
-    cx = 200
-
-    # --- GEOMETRÍA SEGÚN GÉNERO ---
-    ancho_cuello = 20 if es_masc else 15
-    rostro_path = (
-        "M 157 82 C 157 50, 243 50, 243 82 C 243 114, 232 140, 200 145 C 168 140, 157 114, 157 82 Z"
-        if es_masc else
-        "M 160 84 C 160 52, 240 52, 240 84 C 240 116, 223 142, 200 145 C 177 142, 160 116, 160 84 Z"
-    )
-    cabello_trasero_frente = (
-        f'<path d="M 154 78 C 150 96, 154 115, 160 122 L 240 122 C 246 115, 250 96, 246 78 Z" fill="url(#gradCabello_{id_unico})"/>'
-        if es_masc else
-        f'<path d="M 146 82 C 136 128, 142 172, 158 182 L 242 182 C 258 172, 264 128, 254 82 Z" fill="url(#gradCabello_{id_unico})"/>'
-    )
-    cabello_delantero = (
-        f'<path d="M 154 88 C 150 52, 176 38, 200 39 C 226 39, 250 52, 246 88 C 238 66, 220 58, 200 59 C 180 58, 162 66, 154 88 Z" fill="url(#gradCabello_{id_unico})"/>'
-        if es_masc else
-        f'<path d="M 152 95 C 146 54, 176 38, 204 40 C 232 40, 254 58, 248 95 C 238 70, 220 62, 200 64 C 178 64, 162 74, 152 95 Z" fill="url(#gradCabello_{id_unico})"/>'
-    )
-    cabello_espalda = (
-        f'<path d="M 154 68 C 152 42, 248 42, 246 68 C 248 98, 240 125, 200 128 C 160 125, 152 98, 154 68 Z" fill="url(#gradCabello_{id_unico})"/>'
-        if es_masc else
-        f'<path d="M 146 78 C 146 42, 254 42, 254 78 C 262 128, 252 178, 232 186 Q 200 194 168 186 C 148 178, 138 128, 146 78 Z" fill="url(#gradCabello_{id_unico})"/>'
-    )
-    labios_svg = (
-        f'<path d="M 189 125 Q 200 129 211 125" stroke="{piel_oscura}" stroke-width="2.5" stroke-linecap="round" fill="none"/>'
-        if es_masc else
-        '<path d="M 188 124 Q 200 131 212 124 Q 200 134 188 124 Z" fill="#C96F69"/>'
-    )
-
-    # --- GEOMETRÍA SEGÚN DISEÑO DE PRENDA SUPERIOR ---
-    torso_base = f"""
-        M {cx - sh_w} 162 Q {cx} 152 {cx + sh_w} 162
-        C {cx + sh_w + 4} 195, {cx + ch_w} 215, {cx + wa_w} 245
-        C {cx + wa_w + 4} 265, {cx + hi_w} 275, {cx + hi_w} 294
-        Q {cx} 304 {cx - hi_w} 294
-        C {cx - hi_w} 275, {cx - wa_w - 4} 265, {cx - wa_w} 245
-        C {cx - ch_w} 215, {cx - sh_w - 4} 195, {cx - sh_w} 162 Z
-    """
-
-    if "Suéter" in top_diseno:
-        # Manga larga hasta las muñecas y cuello redondo alto tejido
-        mangas_svg = f"""
-            <path d="M {cx - sh_w + 2} 162 C {cx - sh_w - 20} 210, {cx - sh_w - 22} 255, {cx - sh_w - 16} 302 L {cx - sh_w - 1} 302 C {cx - sh_w - 4} 255, {cx - sh_w - 2} 215, {cx - ch_w + 4} 192 Z" fill="url(#gradTop_{id_unico})"/>
-            <path d="M {cx + sh_w - 2} 162 C {cx + sh_w + 20} 210, {cx + sh_w + 22} 255, {cx + sh_w + 16} 302 L {cx + sh_w + 1} 302 C {cx + sh_w + 4} 255, {cx + sh_w + 2} 215, {cx + ch_w - 4} 192 Z" fill="url(#gradTop_{id_unico})"/>
-        """
-        detalles_top_frente = f"""
-            <path d="M 178 156 Q 200 168 222 156 Q 200 162 178 156 Z" fill="{top_sombra}" stroke="{top_sombra}" stroke-width="4"/>
-            <line x1="{cx - 25}" y1="175" x2="{cx - 25}" y2="290" stroke="{top_sombra}" stroke-width="1.2" stroke-dasharray="4,4" opacity="0.45"/>
-            <line x1="{cx}" y1="170" x2="{cx}" y2="295" stroke="{top_sombra}" stroke-width="1.2" stroke-dasharray="4,4" opacity="0.45"/>
-            <line x1="{cx + 25}" y1="175" x2="{cx + 25}" y2="290" stroke="{top_sombra}" stroke-width="1.2" stroke-dasharray="4,4" opacity="0.45"/>
-        """
-    elif "Camisa" in top_diseno:
-        # Manga media/larga con puño, cuello formal y hilera de botones
-        mangas_svg = f"""
-            <path d="M {cx - sh_w + 2} 162 C {cx - sh_w - 19} 200, {cx - sh_w - 21} 245, {cx - sh_w - 17} 275 L {cx - sh_w - 1} 275 L {cx - ch_w + 4} 192 Z" fill="url(#gradTop_{id_unico})"/>
-            <path d="M {cx + sh_w - 2} 162 C {cx + sh_w + 19} 200, {cx + sh_w + 21} 245, {cx + sh_w + 17} 275 L {cx + sh_w + 1} 275 L {cx + ch_w - 4} 192 Z" fill="url(#gradTop_{id_unico})"/>
-        """
-        detalles_top_frente = f"""
-            <path d="M 182 156 L 200 182 L 218 156 Z" fill="{piel_base}"/>
-            <polygon points="175,154 198,178 184,186 168,164" fill="{top_luz}" stroke="{top_sombra}" stroke-width="1.5"/>
-            <polygon points="225,154 202,178 216,186 232,164" fill="{top_luz}" stroke="{top_sombra}" stroke-width="1.5"/>
-            <line x1="200" y1="180" x2="200" y2="296" stroke="{top_sombra}" stroke-width="3"/>
-            <circle cx="200" cy="198" r="2.5" fill="{top_luz}" stroke="{top_sombra}" stroke-width="1"/>
-            <circle cx="200" cy="222" r="2.5" fill="{top_luz}" stroke="{top_sombra}" stroke-width="1"/>
-            <circle cx="200" cy="246" r="2.5" fill="{top_luz}" stroke="{top_sombra}" stroke-width="1"/>
-            <circle cx="200" cy="270" r="2.5" fill="{top_luz}" stroke="{top_sombra}" stroke-width="1"/>
-        """
-    elif "Blazer" in top_diseno:
-        # Casaca/Blazer abierto con camiseta blanca interior y solapas
-        mangas_svg = f"""
-            <path d="M {cx - sh_w + 2} 162 C {cx - sh_w - 20} 210, {cx - sh_w - 22} 255, {cx - sh_w - 16} 298 L {cx - sh_w - 1} 298 L {cx - ch_w + 4} 192 Z" fill="url(#gradTop_{id_unico})"/>
-            <path d="M {cx + sh_w - 2} 162 C {cx + sh_w + 20} 210, {cx + sh_w + 22} 255, {cx + sh_w + 16} 298 L {cx + sh_w + 1} 298 L {cx + ch_w - 4} 192 Z" fill="url(#gradTop_{id_unico})"/>
-        """
-        detalles_top_frente = f"""
-            <path d="M 184 160 L 216 160 L 214 294 L 186 294 Z" fill="#F7F5F0"/>
-            <polygon points="176,156 188,245 198,245 186,160" fill="{top_sombra}"/>
-            <polygon points="224,156 212,245 202,245 214,160" fill="{top_sombra}"/>
-            <rect x="{cx - hi_w + 14}" y="258" width="22" height="5" rx="2" fill="{top_sombra}"/>
-            <rect x="{cx + hi_w - 36}" y="258" width="22" height="5" rx="2" fill="{top_sombra}"/>
-        """
-    else:
-        # Polo / Blusa manga corta
-        mangas_svg = f"""
-            <path d="M {cx - sh_w + 2} 162 C {cx - sh_w - 16} 185, {cx - sh_w - 18} 215, {cx - sh_w - 18} 228 L {cx - sh_w - 2} 232 L {cx - ch_w + 4} 195 Z" fill="url(#gradTop_{id_unico})"/>
-            <path d="M {cx + sh_w - 2} 162 C {cx + sh_w + 16} 185, {cx + sh_w + 18} 215, {cx + sh_w + 18} 228 L {cx + sh_w + 2} 232 L {cx + ch_w - 4} 195 Z" fill="url(#gradTop_{id_unico})"/>
-        """
-        detalles_top_frente = f"""
-            <path d="M 180 158 L 200 184 L 220 158" fill="{piel_base}" stroke="{top_sombra}" stroke-width="2.5"/>
-        """
-
-    # --- GEOMETRÍA SEGÚN DISEÑO DE PRENDA INFERIOR ---
-    if "Ancho" in bot_diseno:
-        p_izq = f"M {cx - hi_w} 288 L {cx + 2} 294 L {cx - 3} 345 L {cx - 8} 468 L {cx - 58} 468 C {cx - 58} 410, {cx - hi_w - 6} 350, {cx - hi_w} 288 Z"
-        p_der = f"M {cx - 2} 294 L {cx + hi_w} 288 C {cx + hi_w + 6} 350, {cx + 58} 410, {cx + 58} 468 L {cx + 8} 468 L {cx + 3} 345 Z"
-        piernas_piel_svg = ""
-        detalles_bot_frente = f'<line x1="{cx - 32}" y1="305" x2="{cx - 35}" y2="465" stroke="{bot_sombra}" stroke-width="1.5" opacity="0.4"/><line x1="{cx + 32}" y1="305" x2="{cx + 35}" y2="465" stroke="{bot_sombra}" stroke-width="1.5" opacity="0.4"/>'
-        detalles_bot_espalda = ""
-    elif "Bermuda" in bot_diseno:
-        p_izq = f"M {cx - hi_w} 288 L {cx + 2} 294 L {cx - 4} 382 L {cx - 48} 382 C {cx - 48} 345, {cx - hi_w - 2} 315, {cx - hi_w} 288 Z"
-        p_der = f"M {cx - 2} 294 L {cx + hi_w} 288 C {cx + hi_w + 2} 315, {cx + 48} 345, {cx + 48} 382 L {cx + 4} 382 Z"
-        piernas_piel_svg = f"""
-            <rect x="{cx - 38}" y="378" width="22" height="92" rx="8" fill="url(#gradPielCilindro_{id_unico})"/>
-            <rect x="{cx + 16}" y="378" width="22" height="92" rx="8" fill="url(#gradPielCilindro_{id_unico})"/>
-        """
-        detalles_bot_frente = f'<line x1="{cx - hi_w}" y1="378" x2="{cx + hi_w}" y2="378" stroke="{bot_luz}" stroke-width="2" opacity="0.5"/>'
-        detalles_bot_espalda = ""
-    elif "Jeans" in bot_diseno:
-        p_izq = f"M {cx - hi_w} 288 L {cx + 2} 294 L {cx - 4} 345 C {cx - 6} 390, {cx - 14} 435, {cx - 18} 468 L {cx - 44} 468 C {cx - 46} 425, {cx - hi_w - 4} 355, {cx - hi_w} 288 Z"
-        p_der = f"M {cx - 2} 294 L {cx + hi_w} 288 C {cx + hi_w + 4} 355, {cx + 46} 425, {cx + 44} 468 L {cx + 18} 468 C {cx + 14} 435, {cx + 6} 390, {cx + 4} 345 Z"
-        piernas_piel_svg = ""
-        detalles_bot_frente = f"""
-            <path d="M {cx - hi_w + 4} 302 Q {cx - hi_w + 22} 318 {cx - hi_w + 26} 296" fill="none" stroke="#D4AF37" stroke-width="1.8" stroke-dasharray="2,2"/>
-            <path d="M {cx + hi_w - 4} 302 Q {cx + hi_w - 22} 318 {cx + hi_w - 26} 296" fill="none" stroke="#D4AF37" stroke-width="1.8" stroke-dasharray="2,2"/>
-            <line x1="{cx}" y1="294" x2="{cx}" y2="338" stroke="#D4AF37" stroke-width="2" stroke-dasharray="3,2"/>
-            <circle cx="{cx}" cy="298" r="3" fill="#D4AF37"/>
-        """
-        detalles_bot_espalda = f"""
-            <polygon points="{cx-38},308 {cx-14},308 {cx-14},330 {cx-26},338 {cx-38},330" fill="{bot_sombra}" stroke="#D4AF37" stroke-width="1.5" stroke-dasharray="2,2"/>
-            <polygon points="{cx+14},308 {cx+38},308 {cx+38},330 {cx+26},338 {cx+14},330" fill="{bot_sombra}" stroke="#D4AF37" stroke-width="1.5" stroke-dasharray="2,2"/>
-        """
-    else:
-        # Pantalón Sastre / Chino recto
-        p_izq = f"M {cx - hi_w} 288 L {cx + 2} 294 L {cx - 4} 345 C {cx - 6} 390, {cx - 14} 435, {cx - 18} 468 L {cx - 44} 468 C {cx - 46} 425, {cx - hi_w - 4} 355, {cx - hi_w} 288 Z"
-        p_der = f"M {cx - 2} 294 L {cx + hi_w} 288 C {cx + hi_w + 4} 355, {cx + 46} 425, {cx + 44} 468 L {cx + 18} 468 C {cx + 14} 435, {cx + 6} 390, {cx + 4} 345 Z"
-        piernas_piel_svg = ""
-        detalles_bot_frente = f"""
-            <line x1="{cx - 30}" y1="305" x2="{cx - 31}" y2="465" stroke="{bot_luz}" stroke-width="2.5" opacity="0.45"/>
-            <line x1="{cx + 30}" y1="305" x2="{cx + 31}" y2="465" stroke="{bot_luz}" stroke-width="2.5" opacity="0.45"/>
-            <rect x="{cx - hi_w + 2}" y="288" width="{hi_w * 2 - 4}" height="8" rx="2" fill="{bot_sombra}"/>
-        """
-        detalles_bot_espalda = f"""
-            <line x1="{cx - 36}" y1="312" x2="{cx - 16}" y2="312" stroke="{bot_sombra}" stroke-width="2.5"/>
-            <line x1="{cx + 16}" y1="312" x2="{cx + 36}" y2="312" stroke="{bot_sombra}" stroke-width="2.5"/>
-        """
-
-    # --- GEOMETRÍA SEGÚN DISEÑO DE CALZADO ---
-    if "Zapatillas" in sho_diseno:
-        calzado_svg = f"""
-            <path d="M {cx - 46} 464 C {cx - 54} 476, {cx - 52} 488, {cx - 32} 490 L {cx - 14} 490 C {cx - 12} 480, {cx - 14} 468, {cx - 18} 464 Z" fill="url(#gradZap_{id_unico})"/>
-            <rect x="{cx - 52}" y="484" width="40" height="7" rx="3.5" fill="#FFFFFF" stroke="#CCCCCC" stroke-width="1"/>
-            <line x1="{cx - 38}" y1="470" x2="{cx - 24}" y2="470" stroke="#FFFFFF" stroke-width="2"/>
-            <line x1="{cx - 40}" y1="475" x2="{cx - 22}" y2="475" stroke="#FFFFFF" stroke-width="2"/>
-
-            <path d="M {cx + 18} 464 C {cx + 14} 468, {cx + 12} 480, {cx + 14} 490 L {cx + 32} 490 C {cx + 52} 488, {cx + 54} 476, {cx + 46} 464 Z" fill="url(#gradZap_{id_unico})"/>
-            <rect x="{cx + 12}" y="484" width="40" height="7" rx="3.5" fill="#FFFFFF" stroke="#CCCCCC" stroke-width="1"/>
-            <line x1="{cx + 24}" y1="470" x2="{cx + 38}" y2="470" stroke="#FFFFFF" stroke-width="2"/>
-            <line x1="{cx + 22}" y1="475" x2="{cx + 40}" y2="475" stroke="#FFFFFF" stroke-width="2"/>
-        """
-    elif "Botines" in sho_diseno:
-        calzado_svg = f"""
-            <path d="M {cx - 44} 446 L {cx - 18} 446 L {cx - 14} 488 L {cx - 50} 488 C {cx - 52} 475, {cx - 46} 462, {cx - 44} 446 Z" fill="url(#gradZap_{id_unico})"/>
-            <rect x="{cx - 51}" y="485" width="38" height="6" rx="2" fill="#2B1B12"/>
-            <path d="M {cx + 18} 446 L {cx + 44} 446 C {cx + 46} 462, {cx + 52} 475, {cx + 50} 488 L {cx + 14} 488 Z" fill="url(#gradZap_{id_unico})"/>
-            <rect x="{cx + 13}" y="485" width="38" height="6" rx="2" fill="#2B1B12"/>
-        """
-    else:
-        # Mocasines / Zapatos de vestir
-        calzado_svg = f"""
-            <path d="M {cx - 46} 465 C {cx - 52} 478, {cx - 50} 488, {cx - 32} 490 L {cx - 14} 490 C {cx - 12} 482, {cx - 14} 470, {cx - 18} 465 Z" fill="url(#gradZap_{id_unico})"/>
-            <rect x="{cx - 40}" y="472" width="16" height="4" rx="1" fill="#D4AF37"/>
-            <rect x="{cx - 50}" y="486" width="37" height="4" rx="2" fill="#2A1B12"/>
-
-            <path d="M {cx + 18} 465 C {cx + 14} 470, {cx + 12} 482, {cx + 14} 490 L {cx + 32} 490 C {cx + 50} 488, {cx + 52} 478, {cx + 46} 465 Z" fill="url(#gradZap_{id_unico})"/>
-            <rect x="{cx + 24}" y="472" width="16" height="4" rx="1" fill="#D4AF37"/>
-            <rect x="{cx + 13}" y="486" width="37" height="4" rx="2" fill="#2A1B12"/>
-        """
-
-    # Posición del marcador en la regla de altura (140 cm a 200 cm)
-    y_marcador_altura = int(460 - ((altura_cm - 140) / 60.0) * 380)
-    y_marcador_altura = max(55, min(465, y_marcador_altura))
+    datos_escena = {
+        "genero": genero,
+        "altura_cm": altura_cm,
+        "cuerpo": cuerpo,
+        "tono_nombre": tono_nombre,
+        "piel_hex": piel_final,
+        "cabello_hex": cabello_hex,
+        "molde_complexion": float(perfil.get("molde_complexion", 1.0)),
+        "molde_hombros": float(perfil.get("molde_hombros", 1.05)),
+        "molde_pecho": float(perfil.get("molde_pecho", 1.05)),
+        "molde_cintura": float(perfil.get("molde_cintura", 0.78)),
+        "molde_cadera": float(perfil.get("molde_cadera", 1.06)),
+        "top_hex": top_prenda.get("hex", "#C19A6B"),
+        "top_diseno": top_prenda.get("diseno", inferir_diseno(top_prenda.get("nombre", ""), "Parte Superior")),
+        "top_nombre": top_prenda.get("nombre", "Prenda Superior"),
+        "bot_hex": bottom_prenda.get("hex", "#6F4E37"),
+        "bot_diseno": bottom_prenda.get("diseno", inferir_diseno(bottom_prenda.get("nombre", ""), "Parte Inferior")),
+        "bot_nombre": bottom_prenda.get("nombre", "Prenda Inferior"),
+        "sho_hex": shoes_prenda.get("hex", "#4B3020"),
+        "sho_diseno": shoes_prenda.get("diseno", inferir_diseno(shoes_prenda.get("nombre", ""), "Calzado")),
+        "sho_nombre": shoes_prenda.get("nombre", "Calzado")
+    }
+    config_json = json.dumps(datos_escena)
 
     html_3d = f"""
     <!DOCTYPE html>
     <html>
     <head>
+    <meta charset="utf-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body {{
             margin: 0; padding: 0; background: transparent;
@@ -475,312 +295,633 @@ def renderizar_avatar_3d(top_prenda, bottom_prenda, shoes_prenda, perfil, id_uni
             display: flex; flex-direction: column; align-items: center;
             user-select: none;
         }}
-        .escena-3d {{
-            width: 405px; height: 575px;
-            background: radial-gradient(circle at 50% 35%, #FFFDF9 0%, #EFE6D5 65%, #DFCFB5 100%);
+        .escena-wrapper {{
+            width: 420px; height: 600px;
+            background: radial-gradient(circle at 50% 32%, #FFFDF9 0%, #EFE5D4 65%, #DCCAB0 100%);
             border-radius: 22px;
-            box-shadow: inset 0 0 35px rgba(90,60,35,0.14), 0 10px 24px rgba(0,0,0,0.09);
+            box-shadow: inset 0 0 35px rgba(90,60,35,0.14), 0 10px 25px rgba(0,0,0,0.10);
             border: 2px solid #D5C3AE;
             position: relative; overflow: hidden;
+        }}
+        #canvas_{id_unico} {{
+            width: 100%; height: 100%;
             cursor: grab;
         }}
-        .escena-3d:active {{ cursor: grabbing; }}
-
-        /* Separamos la animación de respiración del contenedor de rotación para que NUNCA bloquee el giro */
-        .animacion-respirar {{
-            width: 100%; height: 100%;
-            animation: respirar 3.6s ease-in-out infinite;
-        }}
-        @keyframes respirar {{
-            0%, 100% {{ transform: translateY(0px); }}
-            50% {{ transform: translateY(-4px); }}
-        }}
-        @keyframes parpadear {{
-            0%, 94%, 98%, 100% {{ transform: scaleY(1); }}
-            96% {{ transform: scaleY(0.1); }}
-        }}
-        .ojos {{
-            transform-origin: 200px 101px;
-            animation: parpadear 4.2s infinite;
-        }}
-        .etiqueta-sup {{
+        #canvas_{id_unico}:active {{ cursor: grabbing; }}
+        .hud-top {{
             position: absolute; top: 10px; left: 12px; right: 12px;
             display: flex; justify-content: space-between; align-items: center;
             pointer-events: none; z-index: 10;
         }}
         .badge {{
-            background: rgba(60, 40, 25, 0.85); color: #FFF;
+            background: rgba(60, 40, 25, 0.86); color: #FFF;
             padding: 5px 11px; border-radius: 14px; font-size: 11px; font-weight: 600;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }}
-        .controles-3d {{
+        .regla-3d {{
+            position: absolute; left: 12px; top: 55px; bottom: 95px;
+            width: 44px; pointer-events: none; z-index: 8;
+            display: flex; flex-direction: column; justify-content: space-between;
+            border-left: 2px solid rgba(110, 80, 54, 0.55);
+            padding-left: 5px; font-size: 10px; color: #5A3E28; font-weight: 600;
+        }}
+        .hud-bottom {{
             position: absolute; bottom: 10px; left: 12px; right: 12px;
-            background: rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(5px);
+            background: rgba(255, 255, 255, 0.93);
+            backdrop-filter: blur(6px);
             border-radius: 12px; padding: 8px 12px;
-            display: flex; flex-direction: column; gap: 5px;
+            display: flex; flex-direction: column; gap: 6px;
             font-size: 12px; color: #3B281E; font-weight: 600;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.09);
             z-index: 10;
         }}
         .fila-ctrl {{
             display: flex; justify-content: space-between; align-items: center; gap: 8px;
         }}
-        .btn-giro {{
+        .btn-3d {{
             background: #8A5A36; color: white; border: none; border-radius: 6px;
-            padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
+            padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
         }}
-        .btn-giro:hover {{ opacity: 0.9; }}
+        .btn-3d:hover {{ opacity: 0.9; }}
         input[type=range] {{ accent-color: #8A5A36; flex: 1; cursor: pointer; }}
     </style>
     </head>
     <body>
-    <div class="escena-3d" id="escena_{id_unico}">
-        <div class="etiqueta-sup">
+    <div class="escena-wrapper">
+        <div class="hud-top">
             <span class="badge">🚻 {genero} | 📏 {altura_cm} cm</span>
-            <span class="badge" id="badgeVista_{id_unico}">Vista: Frontal (0°)</span>
+            <span class="badge" id="anguloTxt_{id_unico}">Giro 3D: 0° (Frente)</span>
         </div>
 
-        <div class="animacion-respirar">
-            <svg viewBox="0 0 400 545" width="100%" height="100%">
-                <defs>
-                    <filter id="sombra_{id_unico}" x="-15%" y="-15%" width="130%" height="130%">
-                        <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#2A1B12" flood-opacity="0.25"/>
-                    </filter>
-                    <radialGradient id="gradCara_{id_unico}" cx="42%" cy="35%" r="60%">
-                        <stop offset="0%" stop-color="{piel_luz}"/>
-                        <stop offset="55%" stop-color="{piel_base}"/>
-                        <stop offset="100%" stop-color="{piel_sombra}"/>
-                    </radialGradient>
-                    <linearGradient id="gradPielCilindro_{id_unico}" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="{piel_sombra}"/>
-                        <stop offset="35%" stop-color="{piel_luz}"/>
-                        <stop offset="70%" stop-color="{piel_base}"/>
-                        <stop offset="100%" stop-color="{piel_oscura}"/>
-                    </linearGradient>
-                    <linearGradient id="gradCabello_{id_unico}" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="{cabello_sombra}"/>
-                        <stop offset="35%" stop-color="{cabello_hex}"/>
-                        <stop offset="52%" stop-color="{cabello_luz}"/>
-                        <stop offset="75%" stop-color="{cabello_hex}"/>
-                        <stop offset="100%" stop-color="{cabello_sombra}"/>
-                    </linearGradient>
-                    <linearGradient id="gradTop_{id_unico}" x1="0%" y1="0%" x2="100%" y2="20%">
-                        <stop offset="0%" stop-color="{top_sombra}"/>
-                        <stop offset="30%" stop-color="{top_luz}"/>
-                        <stop offset="65%" stop-color="{top_hex}"/>
-                        <stop offset="100%" stop-color="{top_sombra}"/>
-                    </linearGradient>
-                    <linearGradient id="gradBot_{id_unico}" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="{bot_sombra}"/>
-                        <stop offset="30%" stop-color="{bot_luz}"/>
-                        <stop offset="65%" stop-color="{bot_hex}"/>
-                        <stop offset="100%" stop-color="{bot_sombra}"/>
-                    </linearGradient>
-                    <radialGradient id="gradZap_{id_unico}" cx="38%" cy="30%" r="70%">
-                        <stop offset="0%" stop-color="{sho_luz}"/>
-                        <stop offset="55%" stop-color="{sho_hex}"/>
-                        <stop offset="100%" stop-color="{sho_sombra}"/>
-                    </radialGradient>
-                </defs>
-
-                <!-- Regla Medidora de Estatura 3D a la izquierda -->
-                <g opacity="0.65">
-                    <line x1="28" y1="60" x2="28" y2="480" stroke="#6E5036" stroke-width="2"/>
-                    <line x1="22" y1="80" x2="34" y2="80" stroke="#6E5036" stroke-width="1.5"/>
-                    <text x="38" y="84" font-size="9" fill="#5A3E28">200cm</text>
-                    <line x1="22" y1="205" x2="34" y2="205" stroke="#6E5036" stroke-width="1.5"/>
-                    <text x="38" y="209" font-size="9" fill="#5A3E28">180cm</text>
-                    <line x1="22" y1="330" x2="34" y2="330" stroke="#6E5036" stroke-width="1.5"/>
-                    <text x="38" y="334" font-size="9" fill="#5A3E28">160cm</text>
-                    <line x1="22" y1="455" x2="34" y2="455" stroke="#6E5036" stroke-width="1.5"/>
-                    <text x="38" y="459" font-size="9" fill="#5A3E28">140cm</text>
-                    <!-- Indicador de la altura actual -->
-                    <polygon points="18,{y_marcador_altura} 34,{y_marcador_altura-5} 34,{y_marcador_altura+5}" fill="#8A5A36"/>
-                </g>
-
-                <!-- Plataforma Circular 3D -->
-                <ellipse cx="200" cy="485" rx="92" ry="18" fill="#C8B59E" opacity="0.65"/>
-                <ellipse cx="200" cy="482" rx="72" ry="13" fill="#3D2B1F" opacity="0.26"/>
-
-                <!-- GRUPO DEL AVATAR CON ESCALA DE ALTURA Y GIRO 360 -->
-                <g id="grupoEscala_{id_unico}" transform="translate(200, 485) scale(1, {escala_altura}) translate(-200, -485)">
-                    <g id="grupoGiro_{id_unico}">
-                        <!-- Cabello Posterior -->
-                        {cabello_trasero_frente}
-
-                        <!-- Cuello -->
-                        <path d="M {200 - ancho_cuello} 130 L {200 - ancho_cuello - 2} 168 L {200 + ancho_cuello + 2} 168 L {200 + ancho_cuello} 130 Z" fill="url(#gradPielCilindro_{id_unico})"/>
-
-                        <!-- Brazos y Manos -->
-                        <path d="M {cx - sh_w + 4} 166 C {cx - sh_w - 20} 215, {cx - sh_w - 22} 260, {cx - sh_w - 16} 305 L {cx - sh_w - 2} 305 C {cx - sh_w - 6} 260, {cx - sh_w - 4} 220, {cx - sh_w + 14} 178 Z" fill="url(#gradPielCilindro_{id_unico})"/>
-                        <path d="M {cx + sh_w - 4} 166 C {cx + sh_w + 20} 215, {cx + sh_w + 22} 260, {cx + sh_w + 16} 305 L {cx + sh_w + 2} 305 C {cx + sh_w + 6} 260, {cx + sh_w + 4} 220, {cx + sh_w - 14} 178 Z" fill="url(#gradPielCilindro_{id_unico})"/>
-                        <ellipse cx="{cx - sh_w - 9}" cy="312" rx="8" ry="11" fill="url(#gradCara_{id_unico})"/>
-                        <ellipse cx="{cx + sh_w + 9}" cy="312" rx="8" ry="11" fill="url(#gradCara_{id_unico})"/>
-
-                        <!-- Piernas visibles (si usa bermuda o falda) -->
-                        {piernas_piel_svg}
-
-                        <!-- PARTE INFERIOR (Pantalón / Jeans / Palazzo / Bermuda) -->
-                        <g filter="url(#sombra_{id_unico})">
-                            <path d="{p_izq}" fill="url(#gradBot_{id_unico})"/>
-                            <path d="{p_der}" fill="url(#gradBot_{id_unico})"/>
-                            <g id="detallesBotFrente_{id_unico}">{detalles_bot_frente}</g>
-                            <g id="detallesBotEspalda_{id_unico}" style="display:none;">{detalles_bot_espalda}</g>
-                        </g>
-
-                        <!-- PARTE SUPERIOR (Camisa / Suéter / Polo / Blazer) -->
-                        <g filter="url(#sombra_{id_unico})">
-                            {mangas_svg}
-                            <path d="{torso_base}" fill="url(#gradTop_{id_unico})"/>
-                            <g id="detallesTopFrente_{id_unico}">{detalles_top_frente}</g>
-                            <g id="detallesTopEspalda_{id_unico}" style="display:none;">
-                                <line x1="200" y1="160" x2="200" y2="292" stroke="{top_sombra}" stroke-width="1.5" opacity="0.45"/>
-                            </g>
-                        </g>
-
-                        <!-- CALZADO (Mocasines / Zapatillas / Botines) -->
-                        <g filter="url(#sombra_{id_unico})">
-                            {calzado_svg}
-                        </g>
-
-                        <!-- CABEZA (Rostro Frontal vs Cabello de Espalda) -->
-                        <g id="cabezaParallax_{id_unico}" filter="url(#sombra_{id_unico})">
-                            <ellipse cx="155" cy="104" rx="6" ry="10" fill="{piel_sombra}"/>
-                            <ellipse cx="245" cy="104" rx="6" ry="10" fill="{piel_sombra}"/>
-                            <path d="{rostro_path}" fill="url(#gradCara_{id_unico})"/>
-
-                            <!-- Facciones del Rostro (Se ocultan cuando gira de espaldas) -->
-                            <g id="rostroFrente_{id_unico}">
-                                <g class="ojos">
-                                    <ellipse cx="181" cy="101" rx="8" ry="5.5" fill="#FFF"/>
-                                    <circle cx="181" cy="101" r="4.2" fill="#3E2723"/>
-                                    <circle cx="182.5" cy="99.5" r="1.5" fill="#FFF"/>
-                                    <path d="M 172 99 Q 181 93 190 100" stroke="#221510" stroke-width="{2.5 if not es_masc else 1.8}" fill="none"/>
-
-                                    <ellipse cx="219" cy="101" rx="8" ry="5.5" fill="#FFF"/>
-                                    <circle cx="219" cy="101" r="4.2" fill="#3E2723"/>
-                                    <circle cx="220.5" cy="99.5" r="1.5" fill="#FFF"/>
-                                    <path d="M 210 100 Q 219 93 228 99" stroke="#221510" stroke-width="{2.5 if not es_masc else 1.8}" fill="none"/>
-                                </g>
-                                <path d="M 171 90 Q 181 85 191 89" stroke="{cabello_sombra}" stroke-width="{3.4 if es_masc else 2.4}" stroke-linecap="round" fill="none"/>
-                                <path d="M 209 89 Q 219 85 229 90" stroke="{cabello_sombra}" stroke-width="{3.4 if es_masc else 2.4}" stroke-linecap="round" fill="none"/>
-                                <path d="M 199 97 L 197 112 Q 200 115 203 112" stroke="{piel_oscura}" stroke-width="1.8" fill="none"/>
-                                {labios_svg}
-                                {cabello_delantero}
-                            </g>
-
-                            <!-- Cabello de Espalda (Se muestra al girar más de 90°) -->
-                            <g id="cabezaEspalda_{id_unico}" style="display:none;">
-                                {cabello_espalda}
-                            </g>
-                        </g>
-                    </g>
-                </g>
-            </svg>
+        <div class="regla-3d">
+            <span>200cm</span>
+            <span>185cm</span>
+            <span>170cm</span>
+            <span>155cm</span>
+            <span>140cm</span>
         </div>
 
-        <div class="controles-3d">
+        <div id="canvas_{id_unico}"></div>
+
+        <div class="hud-bottom">
             <div class="fila-ctrl">
-                <span>🔄 Giro 360°:</span>
+                <span>🔄 Rotar 3D:</span>
                 <input type="range" id="slider_{id_unico}" min="-180" max="180" value="0">
-                <button class="btn-giro" id="btnAuto_{id_unico}">▶ Auto-Giro</button>
+                <button class="btn-3d" id="btnAuto_{id_unico}">▶ Giro 360°</button>
             </div>
-            <div style="font-size:10.5px; color:#6E5036; text-align:center;">
-                👕 {top_diseno.split('(')[0]} | 👖 {bot_diseno.split('(')[0]} | 👞 {sho_diseno.split('(')[0]}
+            <div style="font-size:10.5px; color:#5A3E28; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                👕 {datos_escena['top_nombre']} | 👖 {datos_escena['bot_nombre']} | 👞 {datos_escena['sho_nombre']}
             </div>
         </div>
     </div>
 
     <script>
-        (function() {{
-            const slider = document.getElementById('slider_{id_unico}');
-            const btnAuto = document.getElementById('btnAuto_{id_unico}');
-            const escena = document.getElementById('escena_{id_unico}');
-            const badgeVista = document.getElementById('badgeVista_{id_unico}');
+    (function() {{
+        const cfg = {config_json};
+        const container = document.getElementById('canvas_{id_unico}');
+        const slider = document.getElementById('slider_{id_unico}');
+        const btnAuto = document.getElementById('btnAuto_{id_unico}');
+        const anguloTxt = document.getElementById('anguloTxt_{id_unico}');
 
-            const grupoGiro = document.getElementById('grupoGiro_{id_unico}');
-            const rostroFrente = document.getElementById('rostroFrente_{id_unico}');
-            const cabezaEspalda = document.getElementById('cabezaEspalda_{id_unico}');
-            const detTopFrente = document.getElementById('detallesTopFrente_{id_unico}');
-            const detTopEspalda = document.getElementById('detallesTopEspalda_{id_unico}');
-            const detBotFrente = document.getElementById('detallesBotFrente_{id_unico}');
-            const detBotEspalda = document.getElementById('detallesBotEspalda_{id_unico}');
+        const width = 420, height = 600;
+        const scene = new THREE.Scene();
 
-            let anguloActual = 0;
-            let autoGiroActivo = false;
-            let animId = null;
-            let arrastrando = false;
-            let startX = 0;
+        const camera = new THREE.PerspectiveCamera(34, width / height, 0.1, 100);
+        camera.position.set(0, 1.05, 6.2);
+        camera.lookAt(0, 0.95, 0);
 
-            function aplicarRotacion(grados) {{
-                anguloActual = ((grados + 180) % 360 + 360) % 360 - 180;
-                slider.value = Math.round(anguloActual);
+        const renderer = new THREE.WebGLRenderer({{ antialias: true, alpha: true }});
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
 
-                const rad = anguloActual * Math.PI / 180;
-                const cosVal = Math.cos(rad);
-                const sinVal = Math.sin(rad);
+        // Iluminación de estudio 3D (Luz principal, relleno lateral y contraluz para resaltar el volumen al girar)
+        const ambientLight = new THREE.AmbientLight(0xfff8f0, 0.68);
+        scene.add(ambientLight);
 
-                // Efecto 3D volumétrico con escala horizontal suave + desplazamiento de paralaje facial
-                const signo = cosVal >= 0 ? 1 : -1;
-                const escalaX = signo * Math.max(0.58, Math.abs(cosVal));
-                const desplazamientoCara = sinVal * 12;
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.78);
+        keyLight.position.set(3.5, 5.5, 4.5);
+        scene.add(keyLight);
 
-                grupoGiro.setAttribute(
-                    'transform',
-                    `translate(200, 0) scale(${{escalaX}}, 1) translate(-200, 0)`
-                );
-                rostroFrente.setAttribute('transform', `translate(${{desplazamientoCara}}, 0)`);
+        const fillLight = new THREE.DirectionalLight(0xf5e6d3, 0.42);
+        fillLight.position.set(-4.0, 3.0, 2.0);
+        scene.add(fillLight);
 
-                const esEspalda = Math.abs(anguloActual) > 90;
-                rostroFrente.style.display = esEspalda ? 'none' : 'block';
-                cabezaEspalda.style.display = esEspalda ? 'block' : 'none';
-                detTopFrente.style.display = esEspalda ? 'none' : 'block';
-                detTopEspalda.style.display = esEspalda ? 'block' : 'none';
-                detBotFrente.style.display = esEspalda ? 'none' : 'block';
-                detBotEspalda.style.display = esEspalda ? 'block' : 'none';
+        const backLight = new THREE.DirectionalLight(0xffe8cc, 0.48);
+        backLight.position.set(0, 4.0, -4.5);
+        scene.add(backLight);
 
-                let nombreVista = "Frontal";
-                if (esEspalda) nombreVista = "Espalda";
-                else if (Math.abs(anguloActual) > 35) nombreVista = "Perfil 3/4";
-                badgeVista.textContent = `Vista: ${{nombreVista}} (${{Math.round(anguloActual)}}°)`;
+        // Materiales 3D
+        const skinMat = new THREE.MeshStandardMaterial({{ color: cfg.piel_hex, roughness: 0.55, metalness: 0.05 }});
+        const hairMat = new THREE.MeshStandardMaterial({{ color: cfg.cabello_hex, roughness: 0.45, metalness: 0.12 }});
+        const topMat = new THREE.MeshStandardMaterial({{ color: cfg.top_hex, roughness: 0.68, metalness: 0.05, side: THREE.DoubleSide }});
+        const botMat = new THREE.MeshStandardMaterial({{ color: cfg.bot_hex, roughness: 0.72, metalness: 0.06, side: THREE.DoubleSide }});
+        const shoMat = new THREE.MeshStandardMaterial({{ color: cfg.sho_hex, roughness: 0.38, metalness: 0.18 }});
+        const whiteMat = new THREE.MeshStandardMaterial({{ color: 0xf8f8f5, roughness: 0.5 }});
+        const darkMat = new THREE.MeshStandardMaterial({{ color: 0x241811, roughness: 0.4 }});
+        const goldMat = new THREE.MeshStandardMaterial({{ color: 0xd4af37, roughness: 0.25, metalness: 0.8 }});
+        const lipMat = new THREE.MeshStandardMaterial({{ color: cfg.genero === "Masculino" ? cfg.piel_hex : 0xc96f69, roughness: 0.4 }});
+
+        // Pedestal / Base 3D
+        const pedestalGeo = new THREE.CylinderGeometry(0.95, 1.08, 0.12, 48);
+        const pedestalMat = new THREE.MeshStandardMaterial({{ color: 0xc8b299, roughness: 0.6, metalness: 0.1 }});
+        const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
+        pedestal.position.y = -0.78;
+        scene.add(pedestal);
+
+        const ringGeo = new THREE.TorusGeometry(0.96, 0.02, 16, 64);
+        const ringMesh = new THREE.Mesh(ringGeo, goldMat);
+        ringMesh.rotation.x = Math.PI / 2;
+        ringMesh.position.y = -0.72;
+        scene.add(ringMesh);
+
+        // Grupo principal del Avatar 3D
+        const avatarGroup = new THREE.Group();
+        scene.add(avatarGroup);
+
+        // Factores de moldeado anatómico (Hombros, Pecho, Cintura, Cadera, Complexión, Género)
+        const esMasc = (cfg.genero === "Masculino");
+        const comp = cfg.molde_complexion;
+        const wSh = (esMasc ? 0.46 : 0.39) * cfg.molde_hombros * comp;
+        const wCh = (esMasc ? 0.39 : 0.35) * cfg.molde_pecho * comp;
+        const wWa = (esMasc ? 0.33 : 0.26) * cfg.molde_cintura * comp;
+        const wHi = (esMasc ? 0.36 : 0.41) * cfg.molde_cadera * comp;
+
+        // Profundidades 3D reales en el eje Z (para que al rotar de perfil se vea 100% tridimensional)
+        const dCh = (esMasc ? 0.25 : 0.26) * cfg.molde_pecho * comp;
+        const dWa = (esMasc ? 0.22 : 0.19) * cfg.molde_cintura * comp;
+        const dHi = (esMasc ? 0.25 : 0.29) * cfg.molde_cadera * comp;
+
+        // Función constructora de segmentos elípticos 3D suaves (Conecta dos anillos con X y Z independientes)
+        function crearSegmento3D(rxTop, rzTop, rxBot, rzBot, altura, mat, segs=36) {{
+            const geo = new THREE.CylinderGeometry(1, 1, altura, segs, 12, false);
+            const pos = geo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {{
+                const y = pos.getY(i);
+                const t = (y + altura / 2) / altura; // 0 abajo, 1 arriba
+                // Interpolación suave cosenoidal para curvas orgánicas
+                const st = (1 - Math.cos(t * Math.PI)) / 2;
+                const rx = rxBot + (rxTop - rxBot) * st;
+                const rz = rzBot + (rzTop - rzBot) * st;
+                pos.setX(i, pos.getX(i) * rx);
+                pos.setZ(i, pos.getZ(i) * rz);
+            }}
+            geo.computeVertexNormals();
+            return new THREE.Mesh(geo, mat);
+        }}
+
+        // 1. CABEZA Y ROSTRO 3D ESCULPIDO
+        const headGroup = new THREE.Group();
+        headGroup.position.set(0, 1.98, 0);
+        avatarGroup.add(headGroup);
+
+        // Cráneo/Rostro con volumen 3D
+        const headGeo = new THREE.SphereGeometry(0.24, 36, 36);
+        const headMesh = new THREE.Mesh(headGeo, skinMat);
+        headMesh.scale.set(esMasc ? 0.96 : 0.90, 1.15, 1.02);
+        headGroup.add(headMesh);
+
+        // Mandíbula más marcada si es masculino
+        if (esMasc) {{
+            const jawGeo = new THREE.CylinderGeometry(0.18, 0.13, 0.18, 24);
+            const jawMesh = new THREE.Mesh(jawGeo, skinMat);
+            jawMesh.position.set(0, -0.10, 0.02);
+            jawMesh.scale.set(1.0, 1.0, 0.92);
+            headGroup.add(jawMesh);
+        }}
+
+        // Orejas 3D
+        [-1, 1].forEach(side => {{
+            const earGeo = new THREE.SphereGeometry(0.048, 16, 16);
+            const ear = new THREE.Mesh(earGeo, skinMat);
+            ear.scale.set(0.45, 1.1, 0.7);
+            ear.position.set(side * (esMasc ? 0.225 : 0.21), -0.01, -0.01);
+            headGroup.add(ear);
+        }});
+
+        // Nariz 3D que sobresale en el perfil (Eje Z)
+        const noseGeo = new THREE.ConeGeometry(0.032, 0.10, 16);
+        const nose = new THREE.Mesh(noseGeo, skinMat);
+        nose.position.set(0, -0.01, 0.245);
+        nose.rotation.x = 0.22;
+        headGroup.add(nose);
+
+        // Ojos 3D con Pupilas y Cejas
+        [-1, 1].forEach(side => {{
+            const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.034, 16, 16), whiteMat);
+            eyeWhite.scale.set(1.2, 0.85, 0.6);
+            eyeWhite.position.set(side * 0.082, 0.035, 0.215);
+            headGroup.add(eyeWhite);
+
+            const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.019, 16, 16), darkMat);
+            pupil.scale.set(1.0, 1.0, 0.5);
+            pupil.position.set(side * 0.082, 0.035, 0.233);
+            headGroup.add(pupil);
+
+            // Cejas 3D
+            const browGeo = new THREE.BoxGeometry(0.075, esMasc ? 0.022 : 0.014, 0.02);
+            const brow = new THREE.Mesh(browGeo, hairMat);
+            brow.position.set(side * 0.082, 0.082, 0.225);
+            brow.rotation.z = side * -0.08;
+            headGroup.add(brow);
+        }});
+
+        // Labios 3D
+        const lipsGeo = new THREE.TorusGeometry(0.038, 0.014, 12, 24);
+        const lips = new THREE.Mesh(lipsGeo, lipMat);
+        lips.scale.set(1.35, 0.55, 0.7);
+        lips.position.set(0, -0.105, 0.218);
+        headGroup.add(lips);
+
+        // Cabello 3D Volumétrico (según Género)
+        const hairCapGeo = new THREE.SphereGeometry(0.256, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.62);
+        const hairCap = new THREE.Mesh(hairCapGeo, hairMat);
+        hairCap.scale.set(esMasc ? 0.99 : 0.95, 1.12, 1.08);
+        hairCap.position.set(0, 0.03, -0.015);
+        hairCap.rotation.x = -0.18;
+        headGroup.add(hairCap);
+
+        // Flequillo / Volumen superior 3D
+        const topHairGeo = new THREE.SphereGeometry(0.16, 24, 24);
+        const topHair = new THREE.Mesh(topHairGeo, hairMat);
+        topHair.scale.set(1.35, 0.65, 1.15);
+        topHair.position.set(0, 0.23, 0.06);
+        headGroup.add(topHair);
+
+        if (!esMasc) {{
+            // Cabello largo 3D con volumen en la espalda y laterales
+            const backHairGeo = new THREE.CylinderGeometry(0.21, 0.26, 0.58, 28);
+            const backHair = new THREE.Mesh(backHairGeo, hairMat);
+            backHair.scale.set(1.0, 1.0, 0.65);
+            backHair.position.set(0, -0.18, -0.11);
+            headGroup.add(backHair);
+
+            [-1, 1].forEach(side => {{
+                const sideLock = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.42, 16), hairMat);
+                sideLock.position.set(side * 0.20, -0.14, 0.03);
+                sideLock.rotation.z = side * 0.12;
+                headGroup.add(sideLock);
+            }});
+        }} else {{
+            // Nuca masculina 3D
+            const napeHair = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.17, 0.22, 24), hairMat);
+            napeHair.scale.set(0.95, 1.0, 0.75);
+            napeHair.position.set(0, -0.02, -0.07);
+            headGroup.add(napeHair);
+        }}
+
+        // Cuello 3D
+        const neckMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(esMasc ? 0.115 : 0.095, esMasc ? 0.135 : 0.11, 0.24, 24),
+            skinMat
+        );
+        neckMesh.position.set(0, 1.66, 0);
+        avatarGroup.add(neckMesh);
+
+        // 2. TORSO Y PRENDA SUPERIOR 3D (Cambia su geometría según el diseño recomendado)
+        const topDesign = cfg.top_diseno;
+        const scaleCloth = topDesign.includes("Suéter") ? 1.06 : topDesign.includes("Blazer") ? 1.04 : 1.02;
+
+        // Parte alta del torso (Hombros a Pecho)
+        const upperTorso = crearSegmento3D(
+            wSh * scaleCloth, dCh * 0.88 * scaleCloth,
+            wCh * scaleCloth, dCh * scaleCloth,
+            0.34, topMat
+        );
+        upperTorso.position.set(0, 1.43, 0);
+        avatarGroup.add(upperTorso);
+
+        // Volumen pectoral / busto 3D en el eje Z (Hace que el perfil 3D sea realista)
+        [-1, 1].forEach(side => {{
+            const chestVolGeo = new THREE.SphereGeometry(esMasc ? 0.135 : 0.145, 24, 24);
+            const chestVol = new THREE.Mesh(chestVolGeo, topMat);
+            chestVol.scale.set(
+                1.1 * cfg.molde_pecho,
+                esMasc ? 0.85 : 0.95,
+                (esMasc ? 0.65 : 0.92) * cfg.molde_pecho
+            );
+            chestVol.position.set(side * 0.115 * cfg.molde_pecho, 1.34, dCh * 0.58);
+            avatarGroup.add(chestVol);
+        }});
+
+        // Parte media del torso (Pecho a Cintura)
+        const midTorso = crearSegmento3D(
+            wCh * scaleCloth, dCh * scaleCloth,
+            wWa * scaleCloth, dWa * scaleCloth,
+            0.34, topMat
+        );
+        midTorso.position.set(0, 1.10, 0);
+        avatarGroup.add(midTorso);
+
+        // Parte baja del top (Cintura a Cadera Alta)
+        const lowTorso = crearSegmento3D(
+            wWa * scaleCloth, dWa * scaleCloth,
+            wHi * 0.97 * scaleCloth, dHi * 0.95 * scaleCloth,
+            0.22, topMat
+        );
+        lowTorso.position.set(0, 0.83, 0);
+        avatarGroup.add(lowTorso);
+
+        // DETALLES 3D ESPECÍFICOS DEL DISEÑO DE PRENDA SUPERIOR
+        if (topDesign.includes("Camisa")) {{
+            // Cuello de camisa 3D elevado + abertura en V + tapeta y botones 3D
+            const collarGeo = new THREE.CylinderGeometry(0.135, 0.15, 0.09, 28, 1, true, 0.4, Math.PI * 1.75);
+            const collarMesh = new THREE.Mesh(collarGeo, topMat);
+            collarMesh.position.set(0, 1.62, 0);
+            collarMesh.rotation.y = Math.PI * 0.62;
+            avatarGroup.add(collarMesh);
+
+            // Hilera de botones en 3D
+            for (let b = 0; b < 5; b++) {{
+                const btn = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 12), whiteMat);
+                const zOffset = (b < 2) ? dCh * 0.98 : dWa * 0.98;
+                btn.position.set(0, 1.44 - b * 0.14, zOffset + 0.015);
+                avatarGroup.add(btn);
+            }}
+        }} else if (topDesign.includes("Suéter")) {{
+            // Cuello redondo grueso tejido en 3D + pretina inferior
+            const neckRib = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.032, 16, 32), topMat);
+            neckRib.rotation.x = Math.PI / 2;
+            neckRib.position.set(0, 1.60, 0.01);
+            avatarGroup.add(neckRib);
+
+            const waistRib = crearSegmento3D(wHi * 0.99, dHi * 0.97, wHi * 0.97, dHi * 0.95, 0.07, topMat);
+            waistRib.position.set(0, 0.73, 0);
+            avatarGroup.add(waistRib);
+        }} else if (topDesign.includes("Blazer")) {{
+            // Camiseta interior blanca 3D + Solapas estructuradas en relieve
+            const innerFront = crearSegmento3D(wCh * 0.55, dCh * 1.03, wWa * 0.55, dWa * 1.04, 0.82, whiteMat);
+            innerFront.position.set(0, 1.15, 0.015);
+            avatarGroup.add(innerFront);
+
+            [-1, 1].forEach(side => {{
+                const lapelGeo = new THREE.BoxGeometry(0.08, 0.48, 0.035);
+                const lapel = new THREE.Mesh(lapelGeo, topMat);
+                lapel.position.set(side * 0.095, 1.32, dCh * 0.96);
+                lapel.rotation.z = side * -0.18;
+                avatarGroup.add(lapel);
+            }});
+        }} else {{
+            // Polo / Blusa Manga Corta: Escote de piel visible
+            const vNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.04, 0.14, 24), skinMat);
+            vNeck.scale.set(1.0, 1.0, 0.85);
+            vNeck.position.set(0, 1.56, dCh * 0.45);
+            avatarGroup.add(vNeck);
+        }}
+
+        // 3. BRAZOS Y MANGAS 3D (Manga corta vs Manga larga según diseño)
+        const esMangaCorta = topDesign.includes("Polo");
+        [-1, 1].forEach(side => {{
+            const armGroup = new THREE.Group();
+            armGroup.position.set(side * (wSh + 0.04), 1.52, 0);
+            armGroup.rotation.z = side * -0.09;
+            avatarGroup.add(armGroup);
+
+            // Hombro 3D redondeado
+            const shoulderSphere = new THREE.Mesh(new THREE.SphereGeometry(0.095 * comp, 20, 20), topMat);
+            armGroup.add(shoulderSphere);
+
+            // Brazo superior (Cubierto por manga)
+            const upperArm = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.088 * comp, 0.076 * comp, 0.34, 20),
+                topMat
+            );
+            upperArm.position.set(0, -0.18, 0);
+            armGroup.add(upperArm);
+
+            // Antebrazo (Piel si es manga corta, Tela si es manga larga)
+            const foreArmMat = esMangaCorta ? skinMat : topMat;
+            const foreArm = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.074 * comp, 0.058 * comp, 0.34, 20),
+                foreArmMat
+            );
+            foreArm.position.set(0, -0.50, 0.02);
+            foreArm.rotation.x = -0.08;
+            armGroup.add(foreArm);
+
+            // Puño de camisa si corresponde
+            if (topDesign.includes("Camisa")) {{
+                const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.064 * comp, 0.064 * comp, 0.06, 20), whiteMat);
+                cuff.position.set(0, -0.65, 0.03);
+                armGroup.add(cuff);
             }}
 
-            slider.addEventListener('input', function() {{
-                aplicarRotacion(parseFloat(this.value));
-            }});
+            // Mano 3D esculpida
+            const hand = new THREE.Mesh(new THREE.SphereGeometry(0.062 * comp, 16, 16), skinMat);
+            hand.scale.set(0.85, 1.25, 0.65);
+            hand.position.set(0, -0.73, 0.035);
+            armGroup.add(hand);
+        }});
 
-            // Arrastrar con el mouse directamente sobre el avatar
-            escena.addEventListener('mousedown', function(e) {{
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-                arrastrando = true;
-                startX = e.clientX;
-            }});
-            window.addEventListener('mousemove', function(e) {{
-                if (!arrastrando) return;
-                const deltaX = e.clientX - startX;
-                startX = e.clientX;
-                aplicarRotacion(anguloActual + deltaX * 1.1);
-            }});
-            window.addEventListener('mouseup', function() {{
-                arrastrando = false;
-            }});
+        // 4. CADERA, PIERNAS Y PRENDA INFERIOR 3D (Cambia según diseño recomendado)
+        const botDesign = cfg.bot_diseno;
 
-            // Botón de Auto-Giro 360°
-            btnAuto.addEventListener('click', function() {{
-                autoGiroActivo = !autoGiroActivo;
-                btnAuto.textContent = autoGiroActivo ? "⏸ Pausar" : "▶ Auto-Giro";
-                if (autoGiroActivo) {{
-                    function loop() {{
-                        if (!autoGiroActivo) return;
-                        aplicarRotacion(anguloActual + 1.4);
-                        animId = requestAnimationFrame(loop);
-                    }}
-                    loop();
-                }} else if (animId) {{
-                    cancelAnimationFrame(animId);
+        // Pelvis / Cadera 3D
+        const pelvisMesh = crearSegmento3D(wHi * 0.98, dHi * 0.96, wHi * 1.02, dHi * 1.02, 0.24, botMat);
+        pelvisMesh.position.set(0, 0.62, -0.01);
+        avatarGroup.add(pelvisMesh);
+
+        // Volumen glúteo 3D en la parte posterior (Eje -Z)
+        [-1, 1].forEach(side => {{
+            const glute = new THREE.Mesh(new THREE.SphereGeometry(0.145 * comp, 20, 20), botMat);
+            glute.scale.set(1.05 * cfg.molde_cadera, 1.0, 0.85 * cfg.molde_cadera);
+            glute.position.set(side * 0.11 * cfg.molde_cadera, 0.56, -dHi * 0.65);
+            avatarGroup.add(glute);
+
+            // Si son Jeans, añade bolsillos traseros en relieve 3D
+            if (botDesign.includes("Jeans")) {{
+                const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.12, 0.02), goldMat);
+                pocket.position.set(side * 0.11 * cfg.molde_cadera, 0.57, -dHi * 1.02);
+                avatarGroup.add(pocket);
+            }}
+        }});
+
+        // Cinturón 3D en Pantalón Sastre o Jeans
+        if (botDesign.includes("Sastre") || botDesign.includes("Jeans")) {{
+            const belt = crearSegmento3D(wHi * 1.00, dHi * 0.98, wHi * 1.00, dHi * 0.98, 0.045, darkMat);
+            belt.position.set(0, 0.73, -0.005);
+            avatarGroup.add(belt);
+
+            const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.055, 0.03), goldMat);
+            buckle.position.set(0, 0.73, dHi * 0.98);
+            avatarGroup.add(buckle);
+        }}
+
+        const legSep = Math.max(0.135, wHi * 0.44);
+
+        if (botDesign.includes("Bermuda") && !esMasc) {{
+            // Falda 3D acampanada + piernas de piel en 3D
+            const skirt = crearSegmento3D(wHi * 1.01, dHi * 1.01, wHi * 1.28, dHi * 1.22, 0.48, botMat);
+            skirt.position.set(0, 0.32, -0.01);
+            avatarGroup.add(skirt);
+
+            [-1, 1].forEach(side => {{
+                const lowerLeg = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.105 * comp, 0.068 * comp, 0.72, 24),
+                    skinMat
+                );
+                lowerLeg.position.set(side * legSep, -0.22, 0);
+                avatarGroup.add(lowerLeg);
+            }});
+        }} else {{
+            // Piernas de Pantalón (Recto, Jeans, Palazzo Ancho o Bermuda)
+            const esPalazzo = botDesign.includes("Ancho");
+            const esBermuda = botDesign.includes("Bermuda");
+
+            [-1, 1].forEach(side => {{
+                // Muslo 3D
+                const thighTopR = 0.155 * comp * (cfg.molde_cadera * 0.92);
+                const thighBotR = esPalazzo ? thighTopR * 1.12 : 0.118 * comp;
+                const thigh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(thighTopR, thighBotR, 0.52, 24),
+                    botMat
+                );
+                thigh.position.set(side * legSep, 0.26, 0);
+                avatarGroup.add(thigh);
+
+                // Pantorrilla (De tela o de piel si es bermuda)
+                const calfTopR = thighBotR;
+                const calfBotR = esPalazzo ? thighTopR * 1.22 : (esBermuda ? 0.072 * comp : 0.088 * comp);
+                const calfMat = esBermuda ? skinMat : botMat;
+                const calf = new THREE.Mesh(
+                    new THREE.CylinderGeometry(calfTopR, calfBotR, 0.56, 24),
+                    calfMat
+                );
+                calf.position.set(side * legSep, -0.28, 0);
+                avatarGroup.add(calf);
+            }});
+        }}
+
+        // 5. CALZADO 3D VOLUMÉTRICO (Mocasines, Zapatillas con pasadores, Botines)
+        const shoDesign = cfg.sho_diseno;
+        [-1, 1].forEach(side => {{
+            const shoeGroup = new THREE.Group();
+            shoeGroup.position.set(side * legSep, -0.62, 0.05);
+            avatarGroup.add(shoeGroup);
+
+            // Si son Botines, caña alta 3D que sube por el tobillo
+            if (shoDesign.includes("Botines")) {{
+                const bootShaft = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.095 * comp, 0.088 * comp, 0.22, 20),
+                    shoMat
+                );
+                bootShaft.position.set(0, 0.12, -0.04);
+                shoeGroup.add(bootShaft);
+            }}
+
+            // Cuerpo principal del zapato (Proyectado hacia adelante en Z)
+            const footGeo = new THREE.SphereGeometry(0.095, 24, 24);
+            const footMesh = new THREE.Mesh(footGeo, shoMat);
+            footMesh.scale.set(0.95, 0.65, 1.75);
+            footMesh.position.set(0, -0.02, 0.04);
+            shoeGroup.add(footMesh);
+
+            // Suela 3D (Blanca gruesa en zapatillas, oscura con tacón en mocasines/botines)
+            const soleMat = shoDesign.includes("Zapatillas") ? whiteMat : darkMat;
+            const soleGeo = new THREE.BoxGeometry(0.17, shoDesign.includes("Zapatillas") ? 0.045 : 0.028, 0.32);
+            const sole = new THREE.Mesh(soleGeo, soleMat);
+            sole.position.set(0, -0.075, 0.035);
+            shoeGroup.add(sole);
+
+            if (shoDesign.includes("Zapatillas")) {{
+                // Pasadores blancos 3D sobre el empeine
+                for (let l = 0; l < 3; l++) {{
+                    const lace = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.012, 0.016), whiteMat);
+                    lace.position.set(0, 0.025 - l * 0.012, 0.03 + l * 0.035);
+                    shoeGroup.add(lace);
                 }}
-            }});
-        }})();
+            }} else if (shoDesign.includes("Mocasines")) {{
+                // Hebilla dorada clásica en el empeine
+                const bit = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.015, 0.02), goldMat);
+                bit.position.set(0, 0.028, 0.06);
+                shoeGroup.add(bit);
+            }}
+        }});
+
+        // Escala vertical según la estatura en cm (140 cm a 200 cm) manteniendo los pies sobre el pedestal
+        const factorAltura = 0.84 + ((cfg.altura_cm - 140) / 60.0) * 0.24;
+        avatarGroup.scale.set(1.0, factorAltura, 1.0);
+        avatarGroup.position.y = -0.72 + 0.72 * factorAltura - 0.72 * (factorAltura - 1.0) * 0.9;
+
+        // CONTROLES DE ROTACIÓN 3D REAL (360° COMPLETOS SIN APLANARSE)
+        let rotY = 0;
+        let autoGiro = false;
+        let isDragging = false;
+        let prevX = 0;
+
+        function actualizarAnguloUI(deg) {{
+            let norm = ((deg + 180) % 360 + 360) % 360 - 180;
+            slider.value = Math.round(norm);
+            let vista = "Frente";
+            const absD = Math.abs(norm);
+            if (absD > 135) vista = "Espalda";
+            else if (absD > 45) vista = "Perfil 3D";
+            anguloTxt.textContent = `Giro 3D: ${{Math.round(norm)}}° (${{vista}})`;
+        }}
+
+        slider.addEventListener('input', function() {{
+            const deg = parseFloat(this.value);
+            rotY = deg * Math.PI / 180;
+            avatarGroup.rotation.y = rotY;
+            actualizarAnguloUI(deg);
+        }});
+
+        container.addEventListener('mousedown', (e) => {{
+            isDragging = true;
+            prevX = e.clientX;
+        }});
+        window.addEventListener('mousemove', (e) => {{
+            if (!isDragging) return;
+            const dx = e.clientX - prevX;
+            prevX = e.clientX;
+            rotY += dx * 0.015;
+            avatarGroup.rotation.y = rotY;
+            actualizarAnguloUI(rotY * 180 / Math.PI);
+        }});
+        window.addEventListener('mouseup', () => {{ isDragging = false; }});
+
+        // Soporte táctil para celulares/tablets
+        container.addEventListener('touchstart', (e) => {{
+            if (e.touches.length === 1) {{
+                isDragging = true;
+                prevX = e.touches[0].clientX;
+            }}
+        }});
+        window.addEventListener('touchmove', (e) => {{
+            if (!isDragging || e.touches.length !== 1) return;
+            const dx = e.touches[0].clientX - prevX;
+            prevX = e.touches[0].clientX;
+            rotY += dx * 0.015;
+            avatarGroup.rotation.y = rotY;
+            actualizarAnguloUI(rotY * 180 / Math.PI);
+        }});
+        window.addEventListener('touchend', () => {{ isDragging = false; }});
+
+        btnAuto.addEventListener('click', () => {{
+            autoGiro = !autoGiro;
+            btnAuto.textContent = autoGiro ? "⏸ Pausar" : "▶ Giro 360°";
+        }});
+
+        // Bucle de animación 3D (Respiración orgánica + Giro 360°)
+        let clock = new THREE.Clock();
+        function animate() {{
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+
+            // Respiración suave del torso 3D
+            headGroup.position.y = 1.98 + Math.sin(t * 2.2) * 0.008;
+
+            if (autoGiro && !isDragging) {{
+                rotY += 0.018;
+                avatarGroup.rotation.y = rotY;
+                actualizarAnguloUI(rotY * 180 / Math.PI);
+            }}
+
+            renderer.render(scene, camera);
+        }}
+        animate();
+    }})();
     </script>
     </body>
     </html>
@@ -789,13 +930,13 @@ def renderizar_avatar_3d(top_prenda, bottom_prenda, shoes_prenda, perfil, id_uni
 
 # 6. ENCABEZADO Y NAVEGACIÓN PRINCIPAL
 st.title("🧥 EcoArmario 3D")
-st.write("Tu clóset digital con rotación 360°, adaptación de género, altura, silueta y diseños reales de prendas.")
+st.write("Tu clóset digital con maniquí 3D volumétrico real, tamaño moldeable y cambio automático de diseño y color.")
 
 tabs = st.tabs([
     "👗 Mi Armario",
     "➕ Agregar Prenda (Color y Diseño)",
     "📸 Escáner IA",
-    "🧍 Mi Perfil, Género y Altura",
+    "🧍 Cuerpo Moldeable 3D, Género y Altura",
     "✨ Recomendador 3D y Agenda",
     "🤖 Asistente IA",
     "🌍 Impacto Ambiental"
@@ -816,7 +957,7 @@ with tabs[0]:
             <div class="tarjeta-ropa">
                 <h4>{p.get('nombre', 'Prenda')}</h4>
                 <p>📁 <b>Categoría:</b> {p.get('categoria', 'Ropa')}</p>
-                <p>✂️ <b>Diseño:</b> {p.get('diseno', 'Clásico')}</p>
+                <p>✂️ <b>Diseño 3D:</b> {p.get('diseno', 'Clásico')}</p>
                 <p>🎨 <b>Color:</b> {etiqueta}</p>
                 <p>🔄 <b>Usos:</b> {p.get('usos', 1)} puestas</p>
             </div>
@@ -827,12 +968,12 @@ with tabs[0]:
 
 # --- TAB 2: AGREGAR PRENDA CON DISEÑO Y COLOR ---
 with tabs[1]:
-    st.header("➕ Añadir Nueva Prenda (Con Diseño y Color)")
+    st.header("➕ Añadir Nueva Prenda a tu Armario")
     c1, c2 = st.columns(2)
     with c1:
-        nom_in = st.text_input("Nombre de la prenda:", placeholder="Ej: Casaca de mezclilla o Camisa beige")
+        nom_in = st.text_input("Nombre de la prenda:", placeholder="Ej: Blazer Azul o Suéter Tejido")
         cat_in = st.selectbox("Categoría:", ["Parte Superior", "Parte Inferior", "Calzado"])
-        diseno_in = st.selectbox("Diseño visual en el Avatar 3D:", DISENOS_POR_CATEGORIA[cat_in])
+        diseno_in = st.selectbox("Diseño 3D que vestirá el Avatar:", DISENOS_POR_CATEGORIA[cat_in])
         mat_in = st.selectbox("Material:", ["Algodón", "Lino", "Lana", "Denim", "Poliéster", "Cuero", "Lona"])
         usos_in = st.number_input("Veces que ya la has usado:", min_value=1, value=3)
 
@@ -852,7 +993,7 @@ with tabs[1]:
         else:
             huellas = {"Parte Superior": (2700, 5.5), "Parte Inferior": (7500, 15.0), "Calzado": (6000, 12.0)}
             ag, co = huellas[cat_in]
-            st.session_state.armario.append({
+            nueva = {
                 "id": len(st.session_state.armario) + 1,
                 "nombre": nom_in,
                 "categoria": cat_in,
@@ -863,8 +1004,9 @@ with tabs[1]:
                 "usos": int(usos_in),
                 "agua_l": ag,
                 "co2_kg": co
-            })
-            st.success(f"¡'{nom_in}' ({diseno_in}) guardada! Ya puedes probártela en el recomendador 3D.")
+            }
+            st.session_state.armario.append(nueva)
+            st.success(f"¡'{nom_in}' ({diseno_in}) guardada! Ya puedes verla en el Recomendador 3D.")
 
 # --- TAB 3: ESCÁNER IA ---
 with tabs[2]:
@@ -885,10 +1027,10 @@ with tabs[2]:
             except Exception:
                 color_auto_hex = "#8A5A36"
 
-            st.success("¡Color y corte analizados!")
+            st.success("¡Color y diseño detectados!")
             nom_scan = st.text_input("Nombre detectado:", value="Prenda Escaneada")
             cat_scan = st.selectbox("Categoría:", ["Parte Superior", "Parte Inferior", "Calzado"], key="sc_cat")
-            dis_scan = st.selectbox("Diseño detectado:", DISENOS_POR_CATEGORIA[cat_scan], key="sc_dis")
+            dis_scan = st.selectbox("Diseño 3D detectado:", DISENOS_POR_CATEGORIA[cat_scan], key="sc_dis")
             hex_scan = st.color_picker("Color detectado:", color_auto_hex)
 
             if st.button("Guardar Prenda Escaneada"):
@@ -904,14 +1046,14 @@ with tabs[2]:
                     "agua_l": 3200,
                     "co2_kg": 7.0
                 })
-                st.success(f"¡'{nom_scan}' añadida con su diseño y color!")
+                st.success(f"¡'{nom_scan}' añadida con su diseño 3D y color!")
 
-# --- TAB 4: PERFIL, GÉNERO, ALTURA Y AVATAR 3D ---
+# --- TAB 4: PERFIL, GÉNERO, ALTURA Y CUERPO MOLDEABLE EN 3D ---
 with tabs[3]:
-    st.header("🧍 Configura tu Género, Estatura, Silueta y Piel")
-    st.write("Modifica cualquier opción y **gira el avatar 3D** con el deslizador o arrastrando con el mouse.")
+    st.header("🧍 Moldea tu Cuerpo 3D, Género, Estatura y Tono de Piel")
+    st.write("Ajusta tus medidas con los deslizadores y **rota el avatar 3D** con el mouse o el botón de giro 360° para ver su volumen real desde cualquier ángulo.")
 
-    col_p, col_av = st.columns([1.15, 1])
+    col_p, col_av = st.columns([1.18, 1])
     with col_p:
         c_gen, c_alt = st.columns(2)
         with c_gen:
@@ -924,32 +1066,44 @@ with tabs[3]:
             altura_actual = int(st.session_state.perfil.get("altura_cm", 165))
             altura_sel = st.slider("2. Tu Estatura (cm):", min_value=140, max_value=200, value=altura_actual, step=1)
 
-        opciones_cuerpo = [
-            "Reloj de arena / Equilibrado",
-            "Pera / Triángulo",
-            "Triángulo Invertido",
-            "Rectángulo",
-            "Ovalado / Manzana"
-        ]
+        opciones_cuerpo = list(PRESETS_SILUETA.keys())
         cuerpo_actual = st.session_state.perfil.get("cuerpo", opciones_cuerpo[0])
         idx_cuerpo = opciones_cuerpo.index(cuerpo_actual) if cuerpo_actual in opciones_cuerpo else 0
-        cuerpo_sel = st.selectbox("3. Tipo de cuerpo / silueta:", opciones_cuerpo, index=idx_cuerpo)
+        cuerpo_sel = st.selectbox("3. Silueta base (Carga proporciones iniciales):", opciones_cuerpo, index=idx_cuerpo)
 
+        # Si el usuario cambia de preset de silueta, actualiza los valores base moldeables
+        if cuerpo_sel != st.session_state.perfil.get("cuerpo"):
+            preset = PRESETS_SILUETA[cuerpo_sel]
+            st.session_state.perfil["molde_complexion"] = preset["complexion"]
+            st.session_state.perfil["molde_hombros"] = preset["hombros"]
+            st.session_state.perfil["molde_pecho"] = preset["pecho"]
+            st.session_state.perfil["molde_cintura"] = preset["cintura"]
+            st.session_state.perfil["molde_cadera"] = preset["cadera"]
+
+        st.markdown("##### 📐 Moldea el Tamaño Exacto de tu Cuerpo en 3D")
+        m_col1, m_col2 = st.columns(2)
+        with m_col1:
+            molde_comp = st.slider("Complexión / Volumen General:", 0.75, 1.35, float(st.session_state.perfil.get("molde_complexion", 1.0)), 0.02)
+            molde_hom = st.slider("Ancho de Hombros:", 0.75, 1.35, float(st.session_state.perfil.get("molde_hombros", 1.05)), 0.02)
+            molde_pec = st.slider("Volumen de Pecho / Torso:", 0.75, 1.35, float(st.session_state.perfil.get("molde_pecho", 1.05)), 0.02)
+        with m_col2:
+            molde_cin = st.slider("Contorno de Cintura:", 0.65, 1.35, float(st.session_state.perfil.get("molde_cintura", 0.78)), 0.02)
+            molde_cad = st.slider("Ancho y Volumen de Cadera:", 0.75, 1.40, float(st.session_state.perfil.get("molde_cadera", 1.06)), 0.02)
+
+        st.markdown("##### 🎨 Tono de Piel y Cabello")
         opciones_tono = list(TONOS_PIEL.keys())
         tono_actual = st.session_state.perfil.get("tono_nombre", opciones_tono[2])
         idx_tono = opciones_tono.index(tono_actual) if tono_actual in opciones_tono else 2
-        tono_sel = st.selectbox("4. Tono de piel:", opciones_tono, index=idx_tono)
+        tono_sel = st.selectbox("Tono de piel:", opciones_tono, index=idx_tono)
 
-        c_col1, c_col2 = st.columns(2)
+        c_col1, c_col2, c_col3 = st.columns(3)
         with c_col1:
-            piel_sel = st.color_picker("Ajuste exacto de piel:", TONOS_PIEL[tono_sel])
+            piel_sel = st.color_picker("Ajustar piel:", TONOS_PIEL[tono_sel])
         with c_col2:
-            cabello_sel = st.color_picker("Color de cabello:", st.session_state.perfil.get("cabello_hex", "#3B2618"))
-
-        opciones_subtono = ["Cálido (Dorado / Melocotón)", "Frío (Rosado / Azulado)", "Neutro (Equilibrado)"]
-        subtono_actual = st.session_state.perfil.get("subtono", opciones_subtono[0])
-        idx_subtono = opciones_subtono.index(subtono_actual) if subtono_actual in opciones_subtono else 0
-        subtono_sel = st.selectbox("5. Subtono de piel:", opciones_subtono, index=idx_subtono)
+            cabello_sel = st.color_picker("Color cabello:", st.session_state.perfil.get("cabello_hex", "#3B2618"))
+        with c_col3:
+            opciones_subtono = ["Cálido (Dorado / Melocotón)", "Frío (Rosado / Azulado)", "Neutro (Equilibrado)"]
+            subtono_sel = st.selectbox("Subtono:", opciones_subtono)
 
         st.session_state.perfil = {
             "genero": genero_sel,
@@ -958,29 +1112,39 @@ with tabs[3]:
             "tono_nombre": tono_sel,
             "piel_hex": piel_sel,
             "subtono": subtono_sel,
-            "cabello_hex": cabello_sel
+            "cabello_hex": cabello_sel,
+            "molde_complexion": molde_comp,
+            "molde_hombros": molde_hom,
+            "molde_pecho": molde_pec,
+            "molde_cintura": molde_cin,
+            "molde_cadera": molde_cad
         }
 
-        consejo_estatura = obtener_consejo_altura(altura_sel, genero_sel)
         st.markdown(f"""
         <div class="tarjeta-ropa">
-            <h4>💡 Recomendación según tu Altura y Perfil</h4>
-            <p>{consejo_estatura}</p>
+            <h4>💡 Recomendación según tu Altura y Silueta</h4>
+            <p>{obtener_consejo_altura(altura_sel, genero_sel)}</p>
         </div>
         """, unsafe_allow_html=True)
 
     with col_av:
+        # Usa el outfit recomendado actual para mostrar cómo queda en el cuerpo moldeado
         tops_d = [p for p in st.session_state.armario if p.get('categoria') == 'Parte Superior']
         bots_d = [p for p in st.session_state.armario if p.get('categoria') == 'Parte Inferior']
         shos_d = [p for p in st.session_state.armario if p.get('categoria') == 'Calzado']
-        p_top = tops_d[0] if tops_d else {"nombre": "Camisa", "hex": "#C19A6B", "diseno": "Camisa (Cuello y Botones)"}
-        p_bot = bots_d[0] if bots_d else {"nombre": "Pantalón", "hex": "#6F4E37", "diseno": "Pantalón Sastre / Chino (Recto)"}
-        p_sho = shos_d[0] if shos_d else {"nombre": "Calzado", "hex": "#4B3020", "diseno": "Mocasines / Zapatos de Vestir"}
+        if 'outfit_3d' in st.session_state:
+            p_top = st.session_state.outfit_3d['top']
+            p_bot = st.session_state.outfit_3d['bottom']
+            p_sho = st.session_state.outfit_3d['shoes']
+        else:
+            p_top = tops_d[0]
+            p_bot = bots_d[0]
+            p_sho = shos_d[0]
         renderizar_avatar_3d(p_top, p_bot, p_sho, st.session_state.perfil, id_unico="perfil3d")
 
 # --- TAB 5: RECOMENDADOR 3D Y AGENDA ---
 with tabs[4]:
-    st.header("✨ Recomendador 3D (Cambia Color, Diseño y Proporción)")
+    st.header("✨ Recomendador 3D en Vivo (Cambia Diseño y Color en el Avatar)")
     tops = [p for p in st.session_state.armario if p.get('categoria') == 'Parte Superior']
     bottoms = [p for p in st.session_state.armario if p.get('categoria') == 'Parte Inferior']
     shoes = [p for p in st.session_state.armario if p.get('categoria') == 'Calzado']
@@ -988,42 +1152,78 @@ with tabs[4]:
     if not tops or not bottoms or not shoes:
         st.info("Agrega al menos una prenda de cada categoría para ver combinaciones.")
     else:
+        # Inicializa la agenda semanal y el outfit actual si no existen
+        if 'agenda_semanal' not in st.session_state or st.button("🔄 Generar Nuevas Recomendaciones para Hoy y la Semana 🎲"):
+            st.session_state.outfit_3d = {
+                "top": random.choice(tops),
+                "bottom": random.choice(bottoms),
+                "shoes": random.choice(shoes)
+            }
+            dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+            st.session_state.agenda_semanal = {}
+            for d in dias:
+                st.session_state.agenda_semanal[d] = {
+                    "top": random.choice(tops),
+                    "bottom": random.choice(bottoms),
+                    "shoes": random.choice(shoes)
+                }
+
         col_rec, col_3d_rec = st.columns([1.15, 1])
         with col_rec:
             modo_armado = st.radio(
-                "¿Cómo quieres elegir el outfit?",
-                ["Recomendación Inteligente (Según tu altura y color)", "Elegir Prendas Manualmente para Probar en el Avatar"],
-                horizontal=True
+                "¿Qué outfit quieres visualizar en el Avatar 3D?",
+                [
+                    "Recomendación Inteligente del Día",
+                    "Ver un Día de mi Agenda Semanal en el Avatar",
+                    "Personalizar Prendas, Diseños y Colores Manualmente"
+                ]
             )
 
             ocasion = st.selectbox("Ocasión:", ["Casual / Diario", "Oficina / Estudio", "Reunión Elegante", "Fin de Semana"])
 
-            if modo_armado.startswith("Recomendación"):
-                if st.button("Generar Nueva Combinación 🎲") or 'outfit_3d' not in st.session_state:
-                    st.session_state.outfit_3d = {
-                        "top": random.choice(tops),
-                        "bottom": random.choice(bottoms),
-                        "shoes": random.choice(shoes)
-                    }
+            if modo_armado == "Recomendación Inteligente del Día":
+                out = st.session_state.outfit_3d
+            elif modo_armado == "Ver un Día de mi Agenda Semanal en el Avatar":
+                dia_elegido = st.selectbox("Selecciona el día de la semana para probártelo en 3D:", list(st.session_state.agenda_semanal.keys()))
+                out = st.session_state.agenda_semanal[dia_elegido]
+                st.session_state.outfit_3d = out
             else:
                 t_sel = st.selectbox("Elige Parte Superior:", tops, format_func=lambda x: f"{x['nombre']} — {x.get('diseno','')} ({x['color']})")
                 b_sel = st.selectbox("Elige Parte Inferior:", bottoms, format_func=lambda x: f"{x['nombre']} — {x.get('diseno','')} ({x['color']})")
                 s_sel = st.selectbox("Elige Calzado:", shoes, format_func=lambda x: f"{x['nombre']} — {x.get('diseno','')} ({x['color']})")
-                st.session_state.outfit_3d = {"top": t_sel, "bottom": b_sel, "shoes": s_sel}
 
-            out = st.session_state.outfit_3d
+                # Permite probar al instante otro diseño o color sobre la prenda seleccionada
+                st.markdown("###### 🎨 Ajustar Diseño o Color en Vivo sobre el Avatar:")
+                c_mod1, c_mod2, c_mod3 = st.columns(3)
+                with c_mod1:
+                    dis_t_vivo = st.selectbox("Diseño Top:", DISENOS_POR_CATEGORIA["Parte Superior"], index=DISENOS_POR_CATEGORIA["Parte Superior"].index(t_sel.get("diseno", DISENOS_POR_CATEGORIA["Parte Superior"][0])))
+                    col_t_vivo = st.color_picker("Color Top:", t_sel.get("hex", "#C19A6B"))
+                with c_mod2:
+                    dis_b_vivo = st.selectbox("Diseño Inferior:", DISENOS_POR_CATEGORIA["Parte Inferior"], index=DISENOS_POR_CATEGORIA["Parte Inferior"].index(b_sel.get("diseno", DISENOS_POR_CATEGORIA["Parte Inferior"][0])))
+                    col_b_vivo = st.color_picker("Color Inferior:", b_sel.get("hex", "#6F4E37"))
+                with c_mod3:
+                    dis_s_vivo = st.selectbox("Diseño Calzado:", DISENOS_POR_CATEGORIA["Calzado"], index=DISENOS_POR_CATEGORIA["Calzado"].index(s_sel.get("diseno", DISENOS_POR_CATEGORIA["Calzado"][0])))
+                    col_s_vivo = st.color_picker("Color Calzado:", s_sel.get("hex", "#4B3020"))
+
+                out = {
+                    "top": {**t_sel, "diseno": dis_t_vivo, "hex": col_t_vivo},
+                    "bottom": {**b_sel, "diseno": dis_b_vivo, "hex": col_b_vivo},
+                    "shoes": {**s_sel, "diseno": dis_s_vivo, "hex": col_s_vivo}
+                }
+                st.session_state.outfit_3d = out
+
             arm_top_bot = calcular_armonia_colores(out['top'].get('hex', '#FFF'), out['bottom'].get('hex', '#333'))
             consejo_alt = obtener_consejo_altura(st.session_state.perfil.get("altura_cm", 165), st.session_state.perfil.get("genero", "Femenino"))
 
             st.markdown(f"""
             <div class="tarjeta-ropa">
-                <h4>Outfit para: {ocasion}</h4>
+                <h4>Outfit Activo en el Maniquí 3D ({ocasion})</h4>
                 <p>👕 <b>Superior:</b> <span class="muestra-color" style="background:{out['top'].get('hex')};"></span> <b>{out['top']['nombre']}</b><br>
-                <small>✂️ Diseño: {out['top'].get('diseno')} | 🎨 Color: {out['top'].get('color')}</small></p>
+                <small>✂️ Diseño 3D: <b>{out['top'].get('diseno')}</b> | 🎨 Código: {out['top'].get('hex')}</small></p>
                 <p>👖 <b>Inferior:</b> <span class="muestra-color" style="background:{out['bottom'].get('hex')};"></span> <b>{out['bottom']['nombre']}</b><br>
-                <small>✂️ Diseño: {out['bottom'].get('diseno')} | 🎨 Color: {out['bottom'].get('color')}</small></p>
+                <small>✂️ Diseño 3D: <b>{out['bottom'].get('diseno')}</b> | 🎨 Código: {out['bottom'].get('hex')}</small></p>
                 <p>👞 <b>Calzado:</b> <span class="muestra-color" style="background:{out['shoes'].get('hex')};"></span> <b>{out['shoes']['nombre']}</b><br>
-                <small>✂️ Diseño: {out['shoes'].get('diseno')} | 🎨 Color: {out['shoes'].get('color')}</small></p>
+                <small>✂️ Diseño 3D: <b>{out['shoes'].get('diseno')}</b> | 🎨 Código: {out['shoes'].get('hex')}</small></p>
                 <hr>
                 <p>🎨 <b>Armonía de Color:</b> {arm_top_bot}</p>
                 <p>{consejo_alt}</p>
@@ -1035,45 +1235,48 @@ with tabs[4]:
 
         st.divider()
         st.subheader("📅 Agenda Semanal de Outfits")
-        dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-        agenda = []
-        for d in dias:
-            t = random.choice(tops)
-            b = random.choice(bottoms)
-            s = random.choice(shoes)
-            agenda.append({
+        filas_agenda = []
+        for d, conj in st.session_state.agenda_semanal.items():
+            t = conj["top"]
+            b = conj["bottom"]
+            s = conj["shoes"]
+            filas_agenda.append({
                 "Día": d,
-                "Parte Superior (Diseño y Color)": f"{t['nombre']} [{t.get('diseno','').split('(')[0].strip()}] ({t['color']})",
-                "Parte Inferior (Diseño y Color)": f"{b['nombre']} [{b.get('diseno','').split('(')[0].strip()}] ({b['color']})",
-                "Calzado": f"{s['nombre']} ({s['color']})",
+                "Parte Superior (Diseño y Color)": f"{t['nombre']} — {t.get('diseno','')} ({t['color']})",
+                "Parte Inferior (Diseño y Color)": f"{b['nombre']} — {b.get('diseno','')} ({b['color']})",
+                "Calzado": f"{s['nombre']} — {s.get('diseno','')} ({s['color']})",
                 "Compatibilidad": calcular_armonia_colores(t.get('hex', '#FFF'), b.get('hex', '#000'))
             })
-        st.dataframe(pd.DataFrame(agenda), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(filas_agenda), use_container_width=True, hide_index=True)
 
 # --- TAB 6: ASISTENTE IA ---
 with tabs[5]:
-    st.header("🤖 Asistente de Estilo IA (Adaptado a tu Altura y Género)")
+    st.header("🤖 Asistente de Estilo IA (Conectado a tu Avatar 3D)")
     for m in st.session_state.mensajes_ia:
         with st.chat_message(m["rol"]):
             st.write(m["texto"])
 
-    pregunta = st.chat_input("Ej: ¿Qué me pongo hoy según mi altura para verme más estilizado?")
+    pregunta = st.chat_input("Ej: Recomiéndame un outfit formal y vístelo en el avatar 3D...")
     if pregunta:
         st.session_state.mensajes_ia.append({"rol": "user", "texto": pregunta})
         with st.chat_message("user"):
             st.write(pregunta)
 
-        sug_top = random.choice(tops) if tops else {"nombre": "Camisa", "color": "Blanco", "diseno": "Camisa"}
-        sug_bot = random.choice(bottoms) if bottoms else {"nombre": "Pantalón", "color": "Marrón", "diseno": "Recto"}
-        sug_sho = random.choice(shoes) if shoes else {"nombre": "Calzado", "color": "Chocolate"}
+        sug_top = random.choice(tops)
+        sug_bot = random.choice(bottoms)
+        sug_sho = random.choice(shoes)
+        # Actualiza automáticamente el avatar 3D con lo que recomendó la IA
+        st.session_state.outfit_3d = {"top": sug_top, "bottom": sug_bot, "shoes": sug_sho}
+
         alt_u = st.session_state.perfil.get("altura_cm", 165)
         gen_u = st.session_state.perfil.get("genero", "Femenino")
 
         resp = (
-            f"Considerando tu perfil **{gen_u}**, tu estatura de **{alt_u} cm** y tu silueta **{st.session_state.perfil.get('cuerpo')}**, "
-            f"te sugiero combinar tu **{sug_top['nombre']}** (diseño *{sug_top.get('diseno')}* en color *{sug_top.get('color')}*) "
-            f"con tu **{sug_bot['nombre']}** (diseño *{sug_bot.get('diseno')}* en *{sug_bot.get('color')}*) y tus **{sug_sho['nombre']}**. "
-            f"{obtener_consejo_altura(alt_u, gen_u)}"
+            f"¡Listo! He actualizado tu **Avatar 3D** con esta recomendación para tu perfil **{gen_u}** ({alt_u} cm, silueta **{st.session_state.perfil.get('cuerpo')}**):\n\n"
+            f"- 👕 **Superior:** {sug_top['nombre']} (*{sug_top.get('diseno')}*, color *{sug_top.get('color')}*)\n"
+            f"- 👖 **Inferior:** {sug_bot['nombre']} (*{sug_bot.get('diseno')}*, color *{sug_bot.get('color')}*)\n"
+            f"- 👞 **Calzado:** {sug_sho['nombre']} (*{sug_sho.get('diseno')}*)\n\n"
+            f"Ve a la pestaña **Recomendador 3D** para girarlo 360° y ver cómo te queda."
         )
         st.session_state.mensajes_ia.append({"rol": "assistant", "texto": resp})
         with st.chat_message("assistant"):
